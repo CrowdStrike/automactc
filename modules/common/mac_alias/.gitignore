@@ -1,0 +1,12 @@
+*.swp
+*.pyc
+.DS_Store
+__pycache__
+.idea
+*.sublime-project
+*.sublime-workspace
+._*
+*.tar.gz
+*.tar
+*.csv
+*.json
