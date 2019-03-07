@@ -189,8 +189,7 @@ def gen_fullprefix(startTime):
     _runtime = str(startTime.replace(microsecond=0)).replace('+00:00', 'Z').replace(' ', 'T')
 
     # Assemble prefix.
-    # full_prefix = '{0},{1},{2},{3}'.format(_prefix, _hostname, _ip, _runtime).replace(':', '_') ## RELEASE NAMING CONVENTION
-    full_prefix = '{0},{1},{2},{3},fm'.format(_prefix, _hostname, _ip, _runtime).replace(':', '_') ## CS NAMING CONVENTION
+    full_prefix = '{0},{1},{2},{3}'.format(_prefix, _hostname, _ip, _runtime).replace(':', '_')
 
     return full_prefix
 
@@ -209,9 +208,8 @@ class data_writer:
 
     def __init__(self, name, headers, datatype=output_format):
         # TODO: Remove the 'replace' of output once all that stuff is removed from the modules.
-        # self.name = filename_prefix + ',' + name + runID ## RELEASE NAMING CONVENTION
+        self.name = filename_prefix + ',' + name + runID
         self.mod = name
-        self.name = filename_prefix + '_mod_' + name + runID ## CS NAMING CONVENTION
         self.datatype = datatype
         self.headers = headers
         self.output_filename = self.name + '.' + self.datatype
@@ -465,8 +463,7 @@ if __name__ == "__main__":
     OSVersion = finditem(systemversion, 'ProductVersion')
 
     if not args.no_logfile:
-        # prefix_logfile = os.path.join(outputdir, filename_prefix + ',' + logfilename) ## RELEASE NAMING CONVENTION
-        prefix_logfile = os.path.join(outputdir, filename_prefix + '_mod_' + logfilename) ## CS NAMING CONVENTION
+        prefix_logfile = os.path.join(outputdir, filename_prefix + ',' + logfilename)
 
         os.rename(logfile, prefix_logfile)
 
