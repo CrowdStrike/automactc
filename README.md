@@ -36,9 +36,9 @@ Modules can be specified for inclusion or exclusion on a per-module basis. In ot
 	
 	automactc.py -m pslist bash profiler
 
-Or, you can exclude specific modules, to run all EXCEPT those specified, such as dirlist and tracev3:
+Or, you can exclude specific modules, to run all EXCEPT those specified, such as dirlist and autoruns:
 
-	automactc.py -x dirlist tracev3
+	automactc.py -x dirlist autoruns
 
 
 ## Output Control
@@ -51,13 +51,13 @@ Upon successfully populating the output file with data, the file is rolled into 
 
 The name of the tar archive follows the following naming convention:
  
-    prefix,hostname,serial,ip,automactc_runtime.tar
+    prefix,hostname,ip,automactc_runtime.tar
 
 The first field, prefix, can be specified at runtime with -p. If unspecified, the prefix is set to automactc-output. The other fields are populated from data gathered at runtime. This is useful when running automactc on several systems for a single incident. 
 
     automactc.py -m all -p granny-smith
 
-While the default behavior is to generate a tarball, use of the -notar flag will prevent the creation of a tar archive and will leave the output files as-is in the output directory. 
+While the default behavior is to generate a tarball, use of the -nt flag will prevent the creation of a tar archive and will leave the output files as-is in the output directory. 
 
 	automactc.py -m all -p granny-smith -nt 
 
@@ -89,7 +89,7 @@ While the default behavior is to generate a tarball, use of the -notar flag will
 
 ## Advanced usage
 
-By default, automactc populate verbose debug logging into a file named `prefix,hostname,serial,ip,runtime.log`. You can disable the generation of this log with:
+By default, automactc populate verbose debug logging into a file named `prefix,hostname,ip,runtime.log`. You can disable the generation of this log with:
 
 	automactc.py -m all -nl
 
@@ -156,7 +156,7 @@ By default, the dirlist module will NOT recurse into bundle directories, includi
 	
 	'.app', '.framework','.lproj','.plugin','.kext','.osax','.bundle','.driver','.wdgt'
 
-To override this setting, use the -R flag. NOTE: this produces a far higher volume of output and takes significantly more time. These bundle directories will be configurable in a future release.
+To override this setting, use the -R flag. NOTE: this produces a far higher volume of output and takes significantly more time. These bundle directories will be configurable in a future update.
 
 By default, the dirlist module will check codesignatures for all .app, .kext, and .osax files found. To prevent the dirlist module from checking any code signatures, use the -NC flag. *This argument can be used for BOTH dirlist and the autoruns modules.*
 
