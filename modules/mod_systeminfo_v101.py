@@ -66,7 +66,9 @@ def module():
     record['local_hostname'] = full_prefix.split(',')[1]
     record['ipaddress'] = full_prefix.split(',')[2]
 
-    record['computer_name'] = finditem(preferences, 'ComputerName').encode('utf-8')
+    computer_name = finditem(preferences, 'ComputerName')
+    if computer_name is not None:
+        record['computer_name'] = computer_name.encode('utf-8')
     record['hostname'] = finditem(preferences, 'HostName')
     record['model'] = finditem(preferences, 'Model')
     record['product_version'] = OSVersion
