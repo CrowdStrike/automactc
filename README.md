@@ -5,9 +5,9 @@
 This is a modular forensic triage collection framework designed to access various forensic artifacts on macOS, parse them, and present them in formats viable for analysis. The output may provide valuable insights for incident response in a macOS environment. Automactc can be run against a live system or dead disk (as a mounted volume.)
 
 ## Requirements
-	- Python 2.7 (Mac systems ship natively with Python 2.7. Python 3 support will be included in a future update)
-	- MacOS target systems, for live collection (successfully tested on macOS  major releases 10.11 through 10.14)
-	- MacOS analysis systems, for triage against a mounted disk image
+* Python 2.7 (Mac systems ship natively with Python 2.7. Python 3 support will be included in a future update)
+* MacOS target systems, for live collection (successfully tested on macOS  major releases 10.11 through 10.14)
+* MacOS analysis systems, for triage against a mounted disk image
 
 ## Basic usage
 
