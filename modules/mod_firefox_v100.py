@@ -15,7 +15,7 @@ user on disk.
 from common.functions import stats2
 from common.functions import firefox_time
 
-# IMPORT STATIC VARIABLES FROM MACXTR
+# IMPORT STATIC VARIABLES FROM MAIN
 from __main__ import inputdir
 from __main__ import outputdir
 from __main__ import forensic_mode

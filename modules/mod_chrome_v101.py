@@ -18,7 +18,7 @@ from common.functions import firefox_time
 from common.functions import multiglob
 from common.functions import finditem
 
-# IMPORT STATIC VARIABLES FROM MACXTR
+# IMPORT STATIC VARIABLES FROM MAIN
 from __main__ import inputdir
 from __main__ import outputdir
 from __main__ import forensic_mode
@@ -109,7 +109,7 @@ def pull_visit_history(history_db, user, prof, urls_output, urls_headers):
         log.debug("Success. Found {0} lines of data.".format(len(urls_data)))
 
     except Exception, e:
-        log.debug('Failed to run query.', exc_info=True)
+        log.debug('Failed to run query: {0}'.format([traceback.format_exc()]))
 
         u_cnames = get_column_headers(history_db, 'urls')
         log.debug('Columns available: {0}'.format(str(u_cnames)))
@@ -163,7 +163,7 @@ def pull_download_history(history_db, user, prof, downloads_output, downloads_he
         log.debug("Success. Found {0} lines of data.".format(len(downloads_data)))
 
     except Exception, e:
-        log.debug('Failed to run query.', exc_info=True)
+        log.debug('Failed to run query: {0}'.format([traceback.format_exc()]))
 
         duc_cnames = get_column_headers(history_db, 'downloads_url_chains')
         log.debug('Columns available: {0}'.format(str(duc_cnames)))
@@ -216,7 +216,7 @@ def parse_profiles(profile_data, user, profile_output, profile_headers):
                 record[key] = val
 
         record['active_time'] = firefox_time(record['active_time']*1000000)
-        
+
         profile_output.write_entry(record.values())
 
 

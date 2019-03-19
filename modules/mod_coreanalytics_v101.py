@@ -5,7 +5,7 @@ from common.functions import stats2
 from common.functions import finditem
 from common.functions import multiglob
 
-# IMPORT STATIC VARIABLES FROM MACXTR
+# IMPORT STATIC VARIABLES FROM MAIN
 from __main__ import inputdir
 from __main__ import outputdir
 from __main__ import forensic_mode
@@ -27,6 +27,7 @@ import os
 import ast
 import logging
 import plistlib
+import traceback
 import dateutil.parser as parser
 from collections import OrderedDict
 
@@ -135,10 +136,40 @@ def module():
 
     for aggregate in agg_location:
         data = open(aggregate, 'r').read()
-        try:
-            data_lines = json.loads(data)
-        except ValueError:
-            data_lines = json.loads(json.dumps(list(ast.literal_eval(data))))
+        obj_list = data.split('\n')
+
+        if len(obj_list) > 1:
+            obj = [i for i in obj_list if '[[[' in i][0]
+            try: 
+                data_lines = json.loads(obj)
+            except ValueError:
+                try:
+                    data_lines = json.loads(json.dumps(list(ast.literal_eval(obj))))
+                except Exception, e:
+                    data_lines = []
+                    log.debug("Could not parse aggregate file: {0}.".format([traceback.format_exc()]))
+            except Exception, e:
+                data_lines = []
+                log.debug("Could not parse aggregate file: {0}.".format([traceback.format_exc()]))
+
+        elif len(obj_list) == 1:
+            obj = obj_list[0]
+            try: 
+                data_lines = json.loads(obj)
+            except ValueError:
+                try:
+                    data_lines = json.loads(json.dumps(list(ast.literal_eval(obj))))
+                except Exception, e:
+                    data_lines = []
+                    log.debug("Could not parse aggregate file: {0}.".format([traceback.format_exc()]))
+            except Exception, e:
+                data_lines = []
+                log.debug("Could not parse aggregate file: {0}.".format([traceback.format_exc()]))
+
+        else:
+            data_lines = []
+            log.debug("Could not parse aggregate file. File had unusual number of objects to parse: {0}. | {1}".format(str(len(obj_list)), [traceback.format_exc()]))
+
 
         diag_start = stats2(aggregate)['btime']
         diag_end = stats2(aggregate)['mtime']

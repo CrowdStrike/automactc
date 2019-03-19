@@ -15,7 +15,7 @@ to identify the host.
 from common.functions import stats2
 from common.functions import finditem
 
-# KEEP THIS - IMPORT STATIC VARIABLES FROM MACXTR
+# KEEP THIS - IMPORT STATIC VARIABLES FROM MAIN
 from __main__ import inputdir
 from __main__ import outputdir
 from __main__ import forensic_mode
@@ -63,7 +63,7 @@ def module():
     # KEEP THE LINE BELOW TO GENERATE AN ORDEREDDICT BASED ON THE HEADERS
     record = OrderedDict((h, '') for h in _headers)
 
-    record['local_hostname'] = full_prefix.split(',')[1]
+    record['local_hostname'] = finditem(preferences, 'LocalHostName')
     record['ipaddress'] = full_prefix.split(',')[2]
 
     computer_name = finditem(preferences, 'ComputerName')

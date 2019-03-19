@@ -14,7 +14,7 @@ files for each user on disk.
 # IMPORT FUNCTIONS FROM COMMON.FUNCTIONS
 from common.functions import stats2
 
-# IMPORT STATIC VARIABLES FROM MACXTR
+# IMPORT STATIC VARIABLES FROM MAIN
 from __main__ import inputdir
 from __main__ import outputdir
 from __main__ import forensic_mode
@@ -71,12 +71,12 @@ def module():
 
         # Iterate over files found and parse them using ssh-keygen.
         for file in u_ssh_all:
-            p, e = subprocess.Popen(["ssh-keygen", "-l", "-f", file], stdout=subprocess.PIPE).communicate()
+            p, e = subprocess.Popen(["ssh-keygen", "-l", "-f", file], stderr=subprocess.STDOUT, stdout=subprocess.PIPE).communicate()
             record['src_name'] = os.path.basename(file)
-            if not e:
+
+            if not e and not "is not a public key file" in p:
                 p = p.split('\n')
                 p = [x for x in p if len(x) > 0]
-
                 for i in p:
                     data = i.split(' ')
                     record['bits'] = data[0]
@@ -86,6 +86,11 @@ def module():
 
                     line = record.values()
                     output.write_entry(line)
+
+            elif "is not a public key file" in p:
+                log.debug("Could not parse {0}: {1}".format(file, p))
+
+
 
 
 if __name__ == "__main__":

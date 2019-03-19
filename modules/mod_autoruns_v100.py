@@ -19,7 +19,7 @@ from common.functions import get_codesignatures
 from common.functions import multiglob
 from common.mac_alias import Bookmark
 
-# IMPORT STATIC VARIABLES FROM MACXTR
+# IMPORT STATIC VARIABLES FROM MAIN
 from __main__ import inputdir
 from __main__ import outputdir
 from __main__ import forensic_mode
