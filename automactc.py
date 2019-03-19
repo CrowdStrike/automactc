@@ -34,13 +34,14 @@ import csv
 import traceback
 import string
 import logging
+import shutil
 from random import choice
 from datetime import datetime
 from collections import OrderedDict
 from modules.common.functions import finditem
 from multiprocessing import Pool
 
-__version__ = '1.0.0.0'
+__version__ = '1.0.0.1'
 
 # Establish argparser.
 def parseArguments():
@@ -167,8 +168,11 @@ def gen_fullprefix(startTime):
     else:
         try:
             pref_plist = os.path.join(inputdir, 'Library/Preferences/SystemConfiguration/preferences.plist')
-            preferences = plistlib.readPlist()
+            preferences = plistlib.readPlist(pref_plist)
             _hostname = finditem(preferences, 'LocalHostName')
+            if not _hostname:
+                _hostname = finditem(preferences, 'HostName')
+                log.debug("Got hostname from the HostName key, rather than LocalHostName.")
         except Exception:
             _hostname = 'HNERROR'
             log.error("Could not retrieve hostname.")
@@ -183,7 +187,20 @@ def gen_fullprefix(startTime):
             _ip = "255.255.255.255"
             log.error("IPv4 not available, recorded as 255.255.255.255.")
     else:
-        _ip = "255.255.255.255"
+        wifilog = os.path.join(inputdir, 'private/var/log/wifi.log')
+        try:
+            wifi_data = open(wifilog, 'r').readlines()
+            try:
+                last_ip = [i for i in wifi_data if "Local IP" in i][-1].rstrip()
+                _ip = last_ip.split(' ')[-1]
+                iptime = ' '.join(last_ip.split(' ')[0:4])
+                log.debug("Last IP address was assigned around {0} (local time).".format(iptime))
+            except IndexError:
+                log.error("Could not find last IP in wifi.log, recorded as 255.255.255.255.")
+                _ip = "255.255.255.255"
+        except IOError:
+            log.error("Could not parse wifi.log, recorded IP as 255.255.255.255.")
+            _ip = "255.255.255.255"
 
     # Get automactc runtime.
     _runtime = str(startTime.replace(microsecond=0)).replace('+00:00', 'Z').replace(' ', 'T')
@@ -232,7 +249,7 @@ class data_writer:
                 try:
                     writer.writerow(data)
                 except Exception, e:
-                    _log.debug("Could not write line {0} | {1}".format(data, [traceback.format_exc()]))
+                    self._log.debug("Could not write line {0} | {1}".format(data, [traceback.format_exc()]))
         elif self.datatype == 'json':
             zipped_data = del_none(dict(zip(self.headers, data)))
             with open(self.data_file_name, 'a') as data_file:
@@ -240,7 +257,7 @@ class data_writer:
                     json.dump(zipped_data, data_file)
                     data_file.write('\n')
                 except Exception, e:
-                    _log.debug("Could not write line {0} | {1}".format(data, [traceback.format_exc()]))
+                    self._log.debug("Could not write line {0} | {1}".format(data, [traceback.format_exc()]))
 
 
 # Establish class to build tarball of output files on the fly.
@@ -257,7 +274,14 @@ class build_tar:
 
             archive.add(t_fname, fname.replace(runID, ''))
             archive.close()
-            os.remove(t_fname)
+            try:
+                if not os.path.isdir(t_fname):
+                    os.remove(t_fname)
+                else:
+                    shutil.rmtree(t_fname)
+            except OSError:
+                log.error("Added to archive, but could not delete {0}.".format(t_fname))
+
 
 
 # Run the modules that were selected via gen_runlist().
@@ -459,8 +483,15 @@ if __name__ == "__main__":
     filename_prefix = ', '.join(full_prefix.split(', ')[:4])
 
     # Capture the OS version as a float for comparison tests in modules.
-    systemversion = plistlib.readPlist(os.path.join(inputdir, 'System/Library/CoreServices/SystemVersion.plist'))
-    OSVersion = finditem(systemversion, 'ProductVersion')
+    try:
+        systemversion = plistlib.readPlist(os.path.join(inputdir, 'System/Library/CoreServices/SystemVersion.plist'))
+        OSVersion = finditem(systemversion, 'ProductVersion')
+    except IOError:
+        if 'Volumes' not in inputdir and forensic_mode is not True:
+            try:
+                OSVersion, e = subprocess.Popen(["sw_vers", "-productVersion"], stdout=subprocess.PIPE).communicate()
+            except Exception, e:
+                log.error("Could not get OSVersion.")
 
     if not args.no_logfile:
         prefix_logfile = os.path.join(outputdir, filename_prefix + ',' + logfilename)

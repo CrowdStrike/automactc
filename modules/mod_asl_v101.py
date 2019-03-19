@@ -13,7 +13,7 @@ A module intended to read and parse .asl files on disk.
 # IMPORT FUNCTIONS FROM COMMON.FUNCTIONS
 from common.functions import stats2
 
-# IMPORT STATIC VARIABLES FROM MACXTR
+# IMPORT STATIC VARIABLES FROM MAIN
 from __main__ import inputdir
 from __main__ import outputdir
 from __main__ import forensic_mode
@@ -79,7 +79,11 @@ def asl_parse(logfile, logdata, headers, output):
                 val = multilines.get(z).replace('\t', '').replace('  ', '')
                 chain.append(val)
 
-        singlelines[lno] = anchor + ' ' + ''.join(chain)
+        try:
+            singlelines[lno] = anchor + ' ' + ''.join(chain)
+        except TypeError:
+            if not "NOTE:Most system logs have moved" in ''.join(chain):
+                log.debug("Line does not resemble an ASL entry: {0}.".format(chain))
 
     for k, v in singlelines.items():
         line = v
@@ -114,7 +118,9 @@ def module():
     for asllog in varlogasl_inputdir:
         FNULL = open(os.devnull, 'w')
         asl_out, e = subprocess.Popen(
-            ["syslog", "-f", asllog, '-T', 'utc.3'], stdout=subprocess.PIPE, stderr=FNULL).communicate()
+            ["syslog", "-f", asllog, '-T', 'utc.3'], stdout=subprocess.PIPE, stderr=subprocess.STDOUT).communicate()
+        if "Invalid Data Store" in asl_out:
+            log.debug("Could not parse {0}. Invalid Data Store error reported - file may be corrupted.".format(asllog))
         if not e:
             oasllog = asl_out.split('\n')
             asl_parse(asllog, oasllog, headers, output)

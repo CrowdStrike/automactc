@@ -16,7 +16,7 @@ and identify administrative users.
 from common.functions import stats2
 from common.functions import read_bplist
 
-# IMPORT STATIC VARIABLES FROM MACXTR
+# IMPORT STATIC VARIABLES FROM MAIN
 from __main__ import inputdir
 from __main__ import outputdir
 from __main__ import forensic_mode

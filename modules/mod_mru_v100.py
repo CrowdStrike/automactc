@@ -24,7 +24,7 @@ from common.functions import read_bplist
 from common.functions import multiglob
 import common.ccl_bplist as ccl_bplist
 
-# IMPORT STATIC VARIABLES FROM MACXTR
+# IMPORT STATIC VARIABLES FROM MAIN
 from __main__ import inputdir
 from __main__ import outputdir
 from __main__ import forensic_mode

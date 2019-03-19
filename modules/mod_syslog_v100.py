@@ -13,7 +13,7 @@ A module intended to read and parse system.log files on disk.
 # IMPORT FUNCTIONS FROM COMMON.FUNCTIONS
 from common.functions import stats2
 
-# IMPORT STATIC VARIABLES FROM MACXTR
+# IMPORT STATIC VARIABLES FROM MAIN
 from __main__ import inputdir
 from __main__ import outputdir
 from __main__ import forensic_mode

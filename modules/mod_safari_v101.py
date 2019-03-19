@@ -16,7 +16,7 @@ from common.functions import stats2
 from common.functions import read_bplist
 from common.functions import cocoa_time
 
-# IMPORT STATIC VARIABLES FROM MACXTR
+# IMPORT STATIC VARIABLES FROM MAIN
 from __main__ import inputdir
 from __main__ import outputdir
 from __main__ import forensic_mode
@@ -73,14 +73,14 @@ def connect_to_db(db_location, main_table):
                 log.debug("Could not connect [{0}].".format(error[0]))
 
                 if "no such table" in error[0]:
-                    log.error("Module fatal error: necessary table doesn't exist in database.")
+                    log.error("Module fatal error: necessary table doesn't exist in database | {0}".format([traceback.format_exc()]))
                     history_db = None
         elif "no such table" in error[0]:
-            log.error("Module fatal error: necessary table doesn't exist in database.")
+            log.error("Module fatal error: necessary table doesn't exist in database | {0}".format([traceback.format_exc()]))
             history_db = None
 
         else:
-            log.error("Module fatal error: cannot parse database.")
+            log.error("Module fatal error: cannot parse database | {0}".format([traceback.format_exc()]))
             history_db = None
 
     return history_db

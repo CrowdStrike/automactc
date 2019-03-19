@@ -14,7 +14,7 @@ A module intended to parse the QuarantineEventsV2 database.
 from common.functions import cocoa_time
 from common.functions import query_db
 
-# IMPORT STATIC VARIABLES FROM MACXTR
+# IMPORT STATIC VARIABLES FROM MAIN
 from __main__ import inputdir
 from __main__ import outputdir
 from __main__ import forensic_mode
