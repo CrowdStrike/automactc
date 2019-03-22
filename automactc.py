@@ -414,6 +414,14 @@ if __name__ == "__main__":
         print "You need to have root privileges to run this script.\nPlease try again, this time as 'sudo'. Exiting."
         sys.exit(0)
 
+    # Confirm that mount point in forensic mode has required directories - to see if the volume is actually mounted.
+    mount_test = glob.glob(os.path.join(inputdir,'*'))
+    required_dirs = ['Library', 'System', 'Users', 'Applications', 'Network']
+    litmus = [i for i in mount_test if any(i.endswith(d) for d in required_dirs)]
+    if len(litmus) < len(required_dirs) and forensic_mode:
+        print "Mount point doesn't have any of the expected directories underneath. Check if the mount was completed successfully."
+        sys.exit(0)
+
     # Generate outputdir if it doesn't already exist.
     if os.path.isdir(outputdir) is False:
         os.makedirs(outputdir)
@@ -464,7 +472,7 @@ if __name__ == "__main__":
 
     logging.getLogger('').addHandler(ch)
 
-    log.info("Started program at {0}.".format(startTime))
+    log.info("Started automactc (v. {0}) at {1}.".format(__version__, startTime))
     log.debug("Invocation: {0}".format(' '.join(sys.argv)))
 
     # Check if user is trying to run AMTC against mounted volume.
@@ -481,17 +489,28 @@ if __name__ == "__main__":
     # Generate full prefix of the filenames.
     full_prefix = gen_fullprefix(startTime)
     filename_prefix = ', '.join(full_prefix.split(', ')[:4])
+    log.debug("Full prefix: {0}".format(full_prefix))
+
 
     # Capture the OS version as a float for comparison tests in modules.
     try:
         systemversion = plistlib.readPlist(os.path.join(inputdir, 'System/Library/CoreServices/SystemVersion.plist'))
         OSVersion = finditem(systemversion, 'ProductVersion')
+        log.debug("Got OSVersion: {0}".format(OSVersion))
     except IOError:
         if 'Volumes' not in inputdir and forensic_mode is not True:
             try:
                 OSVersion, e = subprocess.Popen(["sw_vers", "-productVersion"], stdout=subprocess.PIPE).communicate()
+                log.debug("Got OSVersion: {0}".format(OSVersion))
             except Exception, e:
-                log.error("Could not get OSVersion.")
+                log.error("Could not get OSVersion: {0}".format([traceback.format_exc()]))
+        else:
+            log.error("Could not get OSVersion: alternative method does not work on forensic image.")
+            OSVersion = None
+    except Exception, e:
+        log.error("Could not get OSVersion: {0}".format([traceback.format_exc()]))
+        OSVersion = None
+
 
     if not args.no_logfile:
         prefix_logfile = os.path.join(outputdir, filename_prefix + ',' + logfilename)
