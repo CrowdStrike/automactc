@@ -35,13 +35,14 @@ import traceback
 import string
 import logging
 import shutil
+import itertools
 from random import choice
 from datetime import datetime
 from collections import OrderedDict
 from modules.common.functions import finditem
 from multiprocessing import Pool
 
-__version__ = '1.0.0.1'
+__version__ = '1.0.0.3'
 
 # Establish argparser.
 def parseArguments():
@@ -140,7 +141,7 @@ def gen_fullprefix(startTime):
     # Get system serial number.
     g = glob.glob(os.path.join(inputdir, 'private/var/folders/zz/zyxvpxvq6csfxvn_n00000sm00006d/C/*'))
     check_dbs = ['consolidated.db', 'cache_encryptedA.db', 'lockCache_encryptedA.db']
-    serial_dbs = [loc for loc in g if any(db in loc for db in check_dbs)]
+    serial_dbs = [loc for loc in g if any(loc.endswith(db) for db in check_dbs)]
     serial_query = 'SELECT SerialNumber FROM TableInfo;'
 
     for db in serial_dbs:
@@ -153,8 +154,16 @@ def gen_fullprefix(startTime):
             break
 
         except sqlite3.OperationalError:
-            _serial = 'SERIALERROR0'
-            log.error("Could not extract serial number from {0}.".format(db))
+            _serial = 'SERIALERROR'
+            log.error("Could not extract serial number from {0}: OperationalError.".format(db))
+
+        except sqlite3.DatabaseError:
+            _serial = 'SERIALERROR'
+            log.error("Could not extract serial number from {0}: DatabaseError.".format(db))
+
+        except Exception, e:
+            _serial = 'SERIALERROR'
+            log.error("Could not extract serial number from {0}: {1}".format(db, [traceback.format_exc()]))
 
     # Get local hostname.
     if 'Volumes' not in inputdir and forensic_mode is not True:
@@ -188,18 +197,37 @@ def gen_fullprefix(startTime):
             log.error("IPv4 not available, recorded as 255.255.255.255.")
     else:
         wifilog = os.path.join(inputdir, 'private/var/log/wifi.log')
+        wifi_bzlogs = glob.glob(os.path.join(inputdir, 'private/var/log/wifi.log.*.bz2'))
+        
         try:
             wifi_data = open(wifilog, 'r').readlines()
             try:
                 last_ip = [i for i in wifi_data if "Local IP" in i][-1].rstrip()
                 _ip = last_ip.split(' ')[-1]
                 iptime = ' '.join(last_ip.split(' ')[0:4])
-                log.debug("Last IP address was assigned around {0} (local time).".format(iptime))
+                log.debug("Last IP address {0} was assigned around {1} (local time).".format(_ip,iptime))
             except IndexError:
-                log.error("Could not find last IP in wifi.log, recorded as 255.255.255.255.")
-                _ip = "255.255.255.255"
+                log.debug("Could not find last IP in wifi.log, will check historical wifi.log.*.bz2 files.")
         except IOError:
-            log.error("Could not parse wifi.log, recorded IP as 255.255.255.255.")
+            log.debug("Could not parse wifi.log, will check historical wifi.log.*.bz2 files.")
+
+        wdata = []
+        if len(wifi_bzlogs) > 0:
+            for i in wifi_bzlogs:
+                try:
+                    wifi_bzdata, e = subprocess.Popen(["bzcat", i], stdout=subprocess.PIPE, stderr=subprocess.STDOUT).communicate()
+                    wdata.append(wifi_bzdata.split('\n'))
+                except Exception, e:
+                    log.debug("Could not parse {0}.".format(i))
+        w = list(itertools.chain.from_iterable(wdata))
+        
+        try:
+            last_ip = [i for i in w if "Local IP" in i][0].rstrip()
+            _ip = last_ip.split(' ')[-1]
+            iptime = ' '.join(last_ip.split(' ')[0:4])
+            log.debug("Last IP address {0} was assigned around {1} (local time).".format(_ip,iptime))
+        except Exception, e:
+            log.debug("Could not get last IP from current or historical wifi.log files. Recorded at 255.255.255.255.")
             _ip = "255.255.255.255"
 
     # Get automactc runtime.
