@@ -64,32 +64,32 @@ While the default behavior is to generate a tarball, use of the -nt flag will pr
 
 ## Current Modules
 
-	- pslist 1.0.0 (current process list at time of automactc run)
-	- lsof 1.0.0 (current file handles open at time of automactc run)
-	- netstat 1.0.0 (current network connections at time of automactc run)
-	- asl 1.0.0 (parsed Apple System Log (.asl) files)
-	- autoruns 1.0.0 (parsing of various persistence locations and plists)
-	- bash 1.0.0 (parsing bash/.*_history files for all users)
-	- chrome 1.0.0 (parsing chrome visit history and download history)
-	- coreanalytics 1.0.0 (parsing program execution evidence produced by Apple diagnostics)
-	- dirlist 1.0.0 (list hof files and directories across the disk)
-	- firefox 1.0.0 (parsing firefox visit history and download history)
-	- installhistory 1.0.0 (parsing program installation history)
-	- mru 1.0.0 (parsing SFL and MRU plist files)
-	- quarantines 1.0.0 (parsing QuarantineEventsV2 database)
-	- quicklook 1.0.0 (parsing Quicklooks database)
-	- safari 1.0.0 (parsing safari visit history and download history)
-	- spotlight 1.0.0 (parsing user spotlight top searches)
-	- ssh 1.0.0 (parsing known_hosts and authorized_keys files for each user)
-	- syslog 1.0.0 (parsing system.log files)
-	- systeminfo 1.0.0 (basic system identification, such as current IP address, serial no, hostname)
-	- users 1.0.0 (listing present and deleted users on the system)
-	- utmpx 1.0.0 (listing user sessions on terminals)
+	- pslist (current process list at time of automactc run)
+	- lsof (current file handles open at time of automactc run)
+	- netstat (current network connections at time of automactc run)
+	- asl (parsed Apple System Log (.asl) files)
+	- autoruns (parsing of various persistence locations and plists)
+	- bash (parsing bash/.*_history files for all users)
+	- chrome (parsing chrome visit history and download history)
+	- coreanalytics (parsing program execution evidence produced by Apple diagnostics)
+	- dirlist (list hof files and directories across the disk)
+	- firefox (parsing firefox visit history and download history)
+	- installhistory (parsing program installation history)
+	- mru (parsing SFL and MRU plist files)
+	- quarantines (parsing QuarantineEventsV2 database)
+	- quicklook (parsing Quicklooks database)
+	- safari (parsing safari visit history and download history)
+	- spotlight (parsing user spotlight top searches)
+	- ssh (parsing known_hosts and authorized_keys files for each user)
+	- syslog (parsing system.log files)
+	- systeminfo (basic system identification, such as current IP address, serial no, hostname)
+	- users (listing present and deleted users on the system)
+	- utmpx (listing user sessions on terminals)
 
 
 ## Advanced usage
 
-By default, automactc populate verbose debug logging into a file named `prefix,hostname,ip,runtime.log`. You can disable the generation of this log with:
+By default, automactc populates verbose debug logging into a file named `prefix,hostname,ip,runtime.log`. You can disable the generation of this log with:
 
 	automactc.py -m all -nl
 
@@ -105,7 +105,7 @@ Automactc runs with the lowest CPU priority (niceness) possible by default. It i
 
 	automactc.py -m all -r 
 
-Automactc can also be run against a dead disk, if the disk is mounted as a volume on the analysis system. Once mounted, run automactc with the appropriate inputdir (pointing to the Volume mount point) and -f to toggle forensic mode ON. 
+Automactc can also be run against a dead disk, if the disk is mounted as a volume on the analysis system. Once mounted, run automactc with the appropriate inputdir (pointing to the Volume mount point) and -f to toggle forensic mode ON.
 
 NOTE: for a live system, if you wish to collect dirlist on mounted peripheral devices, you can use -f with -i /, else dirlist will not recurse further into mounted /Volumes. 
 
@@ -123,7 +123,7 @@ It is also possible to exclude specific directories from dirlist recursion with 
 
 	automactc.py -m dirlist -E /path/to/KnownDevDirectory
 
-By default, the following directories and file are excluded:
+By default, the following directories and file are excluded on live systems:
 
 	/.fseventsd (to reduce output verbosity)
 	/.DocumentRevisions-V100 (to reduce output verbosity)
@@ -133,6 +133,12 @@ By default, the following directories and file are excluded:
 	/Users/*/Calendar (to avoid permissions errors)
 	/Users/*/Library/Calendars (to avoid permissions errors)
 	/Users/*/Library/Preferences/com.apple.AddressBook.plist (to avoid permissions errors)
+
+By default, the following directories are excluded when running forensic mode against a mounted image:
+	
+	/.fseventsd (to reduce output verbosity)
+	/.DocumentRevisions-V100 (to reduce output verbosity)
+	/.Spotlight-V100 (to reduce output verbosity)
 
  Any additional directories to exclude will be appended to this default list, unless you provide the -E no-defaults argument first, in which case only your specified directories will be excluded.
 
