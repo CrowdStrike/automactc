@@ -1,5 +1,13 @@
 # AutoMacTC Changelog
 
+## Main v. 1.0.0.4 (2019-04-27)
+
+* Implementing modules as classes to remove code execution at import time.
+* Introducing ModuleRegistry for storing and accessing module classes.
+* Refactoring the CLI to reduce the use of globals and removing usage of `__main__` imports from modules.
+* Migrating python package files to within a top-level `automactc` folder to better support packaging.
+* Adding setuptools support (`setup.py`) to allow for installing via pip. This will result in a `automactc` executable being installed.
+
 ## Main v. 1.0.0.3 (2019-03-26)
 
 * Fixed bug with output debug log messages.
@@ -9,7 +17,7 @@
 * Added handling for removing output files OR directories after successfully adding to the tar archive.
 * Added handling for use of forensic mode against a mount point that wasn't successfully mounted (i.e. has none of the expected directories underneath).
 * Added handling for exceptions thrown when we can't find OSVersion correctly on live or dead images. Also updated Safari, Quicklooks, and CoreAnalytics to account for the change. Now, if OSVersion can't be found, it will be marked and handled as None in comparison tests.
-* Fixed a bug where the program would hang if it couldn't obtain the serial number. 
+* Fixed a bug where the program would hang if it couldn't obtain the serial number.
 * Added ability to try to get last IP in forensic mode from wifi.log, including bz2 historical logs.
 
 ## Systeminfo v. 1.0.2 (2019-03-26)
@@ -48,4 +56,4 @@
 * Throw an error if the admin.plist can't be parsed from a forensic image indicating that admins could not be determined.
 
 ## Dirlist v. 1.0.1 (2019-03-26)
-* Fixed a bug with default directory exclusions in forensic mode. 
+* Fixed a bug with default directory exclusions in forensic mode.
