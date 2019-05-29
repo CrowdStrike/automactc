@@ -98,8 +98,6 @@ def asl_parse(logfile, logdata, headers, output):
             record['pid'] = m.group('PID')
             record['message'] = m.group('message')
 
-            output.write_entry(record.values())
-
 
 
 def module():
@@ -121,6 +119,7 @@ def module():
             ["syslog", "-f", asllog, '-T', 'utc.3'], stdout=subprocess.PIPE, stderr=subprocess.STDOUT).communicate()
         if "Invalid Data Store" in asl_out:
             log.debug("Could not parse {0}. Invalid Data Store error reported - file may be corrupted.".format(asllog))
+            continue
         if not e:
             oasllog = asl_out.split('\n')
             asl_parse(asllog, oasllog, headers, output)

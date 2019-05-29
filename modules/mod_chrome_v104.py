@@ -50,8 +50,12 @@ log = logging.getLogger(_modName)
 
 
 def get_column_headers(db, column):
-    col_headers = sqlite3.connect(db).cursor().execute('SELECT * from {0}'.format(column))
-    names = list(map(lambda x: x[0], col_headers.description))
+    try:
+        col_headers = sqlite3.connect(db).cursor().execute('SELECT * from {0}'.format(column))
+        names = list(map(lambda x: x[0], col_headers.description))
+    except sqlite3.OperationalError:
+        log.debug("Column '{0}' was not found in database.".format(column))
+        names = []
     return names
 
 
@@ -112,13 +116,13 @@ def pull_visit_history(history_db, user, prof, urls_output, urls_headers):
         log.debug('Failed to run query: {0}'.format([traceback.format_exc()]))
 
         u_cnames = get_column_headers(history_db, 'urls')
-        log.debug('Columns available: {0}'.format(str(u_cnames)))
+        log.debug('Columns available in "{0}" table: {1}'.format('urls2', str(u_cnames)))
 
         v_cnames = get_column_headers(history_db, 'visits')
-        log.debug('Columns available: {0}'.format(str(v_cnames)))
+        log.debug('Columns available in "{0}" table: {1}'.format('visits', str(v_cnames)))
 
         k_cnames = get_column_headers(history_db, 'keyword_search_terms')
-        log.debug('Columns available: {0}'.format(str(k_cnames)))
+        log.debug('Columns available in "{0}" table: {1}'.format('keyword_search_terms', str(k_cnames)))
 
         return
 
@@ -234,7 +238,7 @@ def module(chrome_location):
     for c in chrome_location:
 
         userpath = c.split('/')
-        userindex = userpath.index('Users') + 1
+        userindex = len(userpath) - 1 - userpath[::-1].index('Users') + 1
         user = userpath[userindex]
 
         log.debug("Parsing Chrome Local State data under {0} user.".format(user))

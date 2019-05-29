@@ -44,7 +44,7 @@ def module():
     output = data_writer(_modName, _headers)
 
     user_inputdir = glob.glob(os.path.join(inputdir, "Users/*"))
-    user_inputdir.append(os.path.join(inputdir, "var/root"))
+    user_inputdir += glob.glob(os.path.join(inputdir, "var/*"))
 
     for user_home in user_inputdir:
         # Get username from path.
@@ -66,6 +66,7 @@ def module():
 
         # Combine all files into a list and parse them iteratively.
         if len(u_bash) != 0 or len(u_bash_sess) != 0:
+            log.debug("Going to parse bash and other history under {0} user.".format(user))
             u_bash_all = u_bash + u_bash_sess
 
             for sess in u_bash_all:

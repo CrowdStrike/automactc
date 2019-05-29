@@ -161,8 +161,8 @@ def parse_cron(headers, output):
 
 
 def parse_LaunchAgentsDaemons(headers, output):
-    LaunchAgents = multiglob(inputdir, ['System/Library/LaunchAgents/*.plist','Library/LaunchAgents/*.plist','Users/*/Library/LaunchAgents/*.plist',
-                                        'System/Library/LaunchAgents/.*.plist','Library/LaunchAgents/.*.plist','Users/*/Library/LaunchAgents/.*.plist'])
+    LaunchAgents = multiglob(inputdir, ['System/Library/LaunchAgents/*.plist','Library/LaunchAgents/*.plist','Users/*/Library/LaunchAgents/*.plist','private/var/*/Library/LaunchAgents/*.plist',
+                                        'System/Library/LaunchAgents/.*.plist','Library/LaunchAgents/.*.plist','Users/*/Library/LaunchAgents/.*.plist', 'private/var/*/Library/LaunchAgents/.*.plist'])
     LaunchDaemons = multiglob(inputdir, ['System/Library/LaunchDaemons/*.plist','Library/LaunchDaemons/*.plist',
                                          'System/Library/LaunchDaemons/.*.plist','Library/LaunchDaemons/.*.plist'])
 
@@ -274,7 +274,7 @@ def parse_PeriodicItems_rcItems_emondItems(headers, output):
 
 
 def parse_loginitems(headers, output):
-    user_loginitems_plist = multiglob(inputdir, ['Users/*/Library/Preferences/com.apple.loginitems.plist'])
+    user_loginitems_plist = multiglob(inputdir, ['Users/*/Library/Preferences/com.apple.loginitems.plist', 'private/var/*/Library/Preferences/com.apple.loginitems.plist'])
 
     for i in user_loginitems_plist:
         record = OrderedDict((h, '') for h in headers)

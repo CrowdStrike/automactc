@@ -89,6 +89,7 @@ def module():
             break
 
         except Exception, e:
+            log.debug("Could not get serial number from {0}: {1}".format(db, [traceback.format_exc()]))
             record['serial_no'] = 'ERROR'
 
     record['volume_created'] = stats2(inputdir + "/", oMACB=True)['btime']

@@ -13,6 +13,7 @@ files for each user on disk.
 
 # IMPORT FUNCTIONS FROM COMMON.FUNCTIONS
 from common.functions import stats2
+from common.functions import multiglob
 
 # IMPORT STATIC VARIABLES FROM MAIN
 from __main__ import inputdir
@@ -42,19 +43,18 @@ def module():
     known_hosts_headers = ['src_name', 'user', 'bits', 'fingerprint', 'host', 'keytype']
     output = data_writer(_modName, known_hosts_headers)
 
-    user_inputdir = glob.glob(os.path.join(inputdir, "Users/*"))
-    user_inputdir.append(os.path.join(inputdir, "var/root"))
+    user_inputdir = multiglob(inputdir, ["Users/*/.ssh", "private/var/*/.ssh"])
 
     record = OrderedDict((h, '') for h in known_hosts_headers)
 
     for user_home in user_inputdir:
-        record['user'] = os.path.basename(user_home)
+        record['user'] = user_home.split('/')[-2]
 
         # Gather known_hosts and authorized_users files for the user.
-        kh_path = os.path.join(user_home, '.ssh/known_hosts')
+        kh_path = os.path.join(user_home, 'known_hosts')
         u_knownhosts = glob.glob(kh_path)
 
-        ak_path = os.path.join(user_home, '.ssh/authorized_keys')
+        ak_path = os.path.join(user_home, 'authorized_keys')
         u_authorizedkeys = glob.glob(ak_path)
 
         # Combine all files found into one list per user.

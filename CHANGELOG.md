@@ -1,6 +1,6 @@
 # AutoMacTC Changelog
 
-## Main v. 1.0.0.3 (2019-03-26)
+## Main v. 1.0.0.5 (2019-04-12)
 
 * Fixed bug with output debug log messages.
 * Added some additional checks to pull hostname successfully.
@@ -11,22 +11,28 @@
 * Added handling for exceptions thrown when we can't find OSVersion correctly on live or dead images. Also updated Safari, Quicklooks, and CoreAnalytics to account for the change. Now, if OSVersion can't be found, it will be marked and handled as None in comparison tests.
 * Fixed a bug where the program would hang if it couldn't obtain the serial number. 
 * Added ability to try to get last IP in forensic mode from wifi.log, including bz2 historical logs.
+* Switched precedence of LocalHostName and HostName when pulling together the output file prefix.
+* Added argument to override the mount point error.
 
-## Systeminfo v. 1.0.2 (2019-03-26)
+## Systeminfo v. 1.0.3 (2019-05-28)
 
 * Fixed a bug where module failed due to an AttributeError produced when computer_name was None but still tried to encode it.
 * Will now pull LocalHostName from the preferences.plist rather than from the full output filename prefix (in case the latter fails for some reason)
 * Fixed a bug where the module would fail if it couldn't successfully get the serial number.
 * Added logic to try to pull timezone from .GlobalPreferences.plist if running in forensic mode against a mounted image.
+* Added a debug message for failures to extract system serial number.
 
-## Chrome v. 1.0.2 (2019-03-22)
+## Chrome v. 1.0.4 (2019-05-28)
 * Added more verbose debug messages. Fix for Issue #1.
 * Added a fix for pulling the correct User profile when using forensic mode and a mount point under /Users/.
+* Per Issue #4, adjusted logic to handle errors gracefully when a table is not present in a History database. Also made column-missing debug messages more verbose.
 
-## Safari v. 1.0.2 (2019-03-22)
+## Safari v. 1.0.3 (2019-03-28)
 * Added more verbose debug messages. Fix for Issue #1.
 * Added a fix for pulling the correct User profile when using forensic mode and a mount point under /Users/.
 * Handle OSVersion cleanly if not detected at initial runtime.
+* Added logic to capture history from any users directories in /private/var/.
+* Added logic to produce a debug message when a History.db file is not found, rather than a "database could not be parsed" one.
 
 ## Firefox v. 1.0.1 (2019-03-22)
 * Added a fix for pulling the correct User profile when using forensic mode and a mount point under /Users/.
@@ -38,14 +44,46 @@
 * Fixed a bug where multi-line aggregate files weren't being parsed.
 * Handle OSVersion cleanly if not detected at initial runtime.
 
-## SSH v. 1.0.1 (2019-03-19)
+## SSH v. 1.0.2 (2019-03-28)
 * Now handling error messages if parsing fails with ssh-keyge (reporting "not an authorized key file"). Fix for Issue #1.
+* Added logic to capture known_hosts and authorized_keys from any users directories in /private/var/.
 
-## ASL v. 1.0.1 (2019-03-19)
+## ASL v. 1.0.2 (2019-05-28)
 * Now handling ASL files that cannot be parsed due to "Invalid Data Store" errors.
+* Bugfix for handling of invalid ASL files, will now skip failed files correctly.
 
-## Users v. 1.0.1 (2019-03-22)
+## Users v. 1.1.0 (2019-04-12)
 * Throw an error if the admin.plist can't be parsed from a forensic image indicating that admins could not be determined.
+* Reworked logic to collect all users, including normal system users comprehensively.
 
-## Dirlist v. 1.0.1 (2019-03-26)
+## Dirlist v. 1.0.2 (2019-05-28)
 * Fixed a bug with default directory exclusions in forensic mode. 
+* Added file owner metadata to output.
+
+## Autoruns v. 1.0.1 (2019-04-12)
+* Added parsing for user profiles under /private/var.
+
+## Bash v. 1.0.1 (2019-04-12)
+* Added parsing for user profiles under /private/var.
+
+## MRU v. 1.0.2 (2019-05-28)
+* Added parsing for user profiles under /private/var.
+* Now extracting and adding username to output, based on MRU file location.
+
+## Quarantines v. 1.0.1 (2019-04-12)
+* Added parsing for user profiles under /private/var.
+* Added a fix for pulling the correct User profile when using forensic mode and a mount point under /Users/.
+
+## Spotlight v. 1.0.1 (2019-04-12)
+* Added parsing for user profiles under /private/var.
+
+## Terminalstate v. 1.0.0 (2019-04-12)
+* Added new module to parse Terminal savedState files under each user profile. 
+
+## Auditlog v. 1.0.0 (2019-05-06)
+* Added new module to parse audit log files under /private/var/audit. 
+
+## common/functions.py (2019-05-28)
+* Improved logic for the stats2 function.
+* Added logic to stats2 to pull file owner metadata.
+

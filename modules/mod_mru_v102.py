@@ -52,9 +52,15 @@ log = logging.getLogger(_modName)
 def parse_sfls(headers, output):
 
     sfl_list = multiglob(inputdir, ['Users/*/Library/Application Support/com.apple.sharedfilelist/*.sfl',
-                          'Users/*/Library/Application Support/com.apple.sharedfilelist/*/*.sfl'])
+                          'Users/*/Library/Application Support/com.apple.sharedfilelist/*/*.sfl',
+                          'private/var/*/Library/Application Support/com.apple.sharedfilelist/*/*.sfl'])
     
     for mru_file in sfl_list:
+
+        userpath = mru_file.split('/')
+        userindex = userpath.index('Library') - 1
+        user = userpath[userindex]
+
         plist_objects = ccl_bplist.deserialise_NsKeyedArchiver(
             ccl_bplist.load(open(mru_file, "rb")), parse_whole_structure=True)
         try:
@@ -74,6 +80,7 @@ def parse_sfls(headers, output):
             for n, item in enumerate(items):
                 record = OrderedDict((h, '') for h in headers)
                 record['src_file'] = mru_file
+                record['user'] = user
                 record['src_name'] = "SharedFileList"
                 try:
                     try:
@@ -93,9 +100,16 @@ def parse_sfls(headers, output):
 
 def parse_sfl2s(headers, output):
     sfl2_list = multiglob(inputdir, ['Users/*/Library/Application Support/com.apple.sharedfilelist/*.sfl2',
-                           'Users/*/Library/Application Support/com.apple.sharedfilelist/*/*.sfl2'])
+                           'Users/*/Library/Application Support/com.apple.sharedfilelist/*/*.sfl2'
+                           'private/var/*/Library/Application Support/com.apple.sharedfilelist/*/*.sfl2'])
+
 
     for mru_file in sfl2_list:
+
+        userpath = mru_file.split('/')
+        userindex = userpath.index('Library') - 1
+        user = userpath[userindex]
+
         plist_objects = ccl_bplist.deserialise_NsKeyedArchiver(
             ccl_bplist.load(open(mru_file, "rb")), parse_whole_structure=True)
 
@@ -116,6 +130,7 @@ def parse_sfl2s(headers, output):
             for n, item in enumerate(items):
                 record = OrderedDict((h, '') for h in headers)
                 record['src_file'] = mru_file
+                record['user'] = user
                 record['src_name'] = "SharedFileList"
 
                 try:
@@ -158,9 +173,15 @@ def parse_sfl2s(headers, output):
 
 
 def parse_securebookmarks(headers, output):
-    secure_bookmarks = multiglob(inputdir, ['Users/*/Library/Containers/*/Data/Library/Preferences/*.securebookmarks.plist'])
+    secure_bookmarks = multiglob(inputdir, ['Users/*/Library/Containers/*/Data/Library/Preferences/*.securebookmarks.plist',
+                                            'private/var/*/Library/Containers/*/Data/Library/Preferences/*.securebookmarks.plist'])
 
     for secure_bookmark_file in secure_bookmarks:
+
+        userpath = secure_bookmark_file.split('/')
+        userindex = userpath.index('Library') - 1
+        user = userpath[userindex]
+
         try:
             data = plistlib.readPlist(secure_bookmark_file)
         except Exception, e:
@@ -172,6 +193,7 @@ def parse_securebookmarks(headers, output):
                 record = OrderedDict((h, '') for h in headers)
                 record['src_file'] = secure_bookmark_file
                 record['src_name'] = "SecureBookmarks"
+                record['user'] = user
                 try:
                     record['url'] = k
                     record['name'] = k.split('/')[-1].encode('utf-8')
@@ -181,9 +203,14 @@ def parse_securebookmarks(headers, output):
 
 
 def parse_finderplists(headers, output):
-    finder_plists = multiglob(inputdir, ['Users/*/Library/Preferences/com.apple.finder.plist'])
+    finder_plists = multiglob(inputdir, ['Users/*/Library/Preferences/com.apple.finder.plist', 'private/var/*/Library/Preferences/com.apple.finder.plist'])
 
     for fplist in finder_plists:
+
+        userpath = fplist.split('/')
+        userindex = userpath.index('Library') - 1
+        user = userpath[userindex]
+
         try:
             data = read_bplist(fplist)[0]
         except Exception, e:
@@ -200,13 +227,14 @@ def parse_finderplists(headers, output):
             try:
                 moveandcopy = data['RecentMoveAndCopyDestinations']
             except KeyError:
-                log.debug("Could not find FXRecentFolders key in plist.")
+                log.debug("Could not find FXRecentFolders key in {0}.".format(fplist))
                 moveandcopy = []
 
             for i in recentfolders:
                 record = OrderedDict((h, '') for h in headers)
                 record['src_file'] = fplist
                 record['src_name'] = "FinderPlist"
+                record['user'] = user
                 try:
                     record['source_key'] = 'FXRecentFolders'
                     record['name'] = i['name'].encode('utf-8')
@@ -219,7 +247,8 @@ def parse_finderplists(headers, output):
             for i in moveandcopy:
                 record = OrderedDict((h, '') for h in headers)
                 record['src_file'] = fplist
-                record['src_name'] = fplist
+                record['src_name'] = "FinderPlist"
+                record['user'] = user
                 try:
                     record['url'] = i
                     record['name'] = i.split('/')[-2].encode('utf-8')
@@ -230,9 +259,14 @@ def parse_finderplists(headers, output):
 
 
 def parse_sidebarplists(headers, output):
-    sidebar_plists = multiglob(inputdir, ['Users/*/Library/Preferences/com.apple.sidebarlists.plist'])
+    sidebar_plists = multiglob(inputdir, ['Users/*/Library/Preferences/com.apple.sidebarlists.plist', 'private/var/*/Library/Preferences/com.apple.sidebarlists.plist'])
 
     for sblist in sidebar_plists:
+
+        userpath = sblist.split('/')
+        userindex = userpath.index('Library') - 1
+        user = userpath[userindex]
+        
         try:
             data = read_bplist(sblist)[0]
         except Exception, e:
@@ -244,6 +278,7 @@ def parse_sidebarplists(headers, output):
                 record = OrderedDict((h, '') for h in headers)
                 record['src_file'] = sblist
                 record['src_name'] = "SidebarPlist"
+                record['user'] = user
                 try:
                     record['name'] = i['Name'].encode('utf-8')
                     if 'Bookmark' in i:
@@ -255,7 +290,7 @@ def parse_sidebarplists(headers, output):
 
 
 def module():
-    headers = ['src_file', 'src_name', 'item_index', 'order', 'name', 'url', 'source_key']
+    headers = ['src_file', 'user', 'src_name', 'item_index', 'order', 'name', 'url', 'source_key']
     output = data_writer(_modName, headers)
 
     parse_sfls(headers, output)

@@ -134,7 +134,7 @@ def filePooler(files):
 	return file_data
 
 
-headers = ['mode','size','uid','gid','mtime','atime','ctime','btime','path','name','sha256','md5','quarantine','wherefrom_1','wherefrom_2','code_signatures']
+headers = ['mode','size','owner','uid','gid','mtime','atime','ctime','btime','path','name','sha256','md5','quarantine','wherefrom_1','wherefrom_2','code_signatures']
 output = data_writer(_modName, headers)
 
 # if there are specific directories to recurse, recurse them.

@@ -44,8 +44,8 @@ def module():
                'sender_address', 'typeno', 'origin_title', 'origin_title', 'origin_url', 'origin_alias']
     output = data_writer(_modName, headers)
 
-    qevents_loc = os.path.join(inputdir, 'Users/*/Library/Preferences/com.apple.LaunchServices.QuarantineEventsV2')
-    qevents_list = glob.glob(qevents_loc)
+    qevents_list = multiglob(inputdir, ['Users/*/Library/Preferences/com.apple.LaunchServices.QuarantineEventsV2', 
+                                        'private/var/*/Library/Preferences/com.apple.LaunchServices.QuarantineEventsV2'])
     qry = 'SELECT * FROM LSQuarantineEvent'
 
     if len(qevents_list) == 0:
@@ -55,7 +55,7 @@ def module():
         data = query_db(i, qry, outputdir)
 
         userpath = i.split('/')
-        userindex = userpath.index('Users') + 1
+        userindex = len(userpath) - 1 - userpath[::-1].index('Users') + 1
         user = userpath[userindex]
 
         for item in data:

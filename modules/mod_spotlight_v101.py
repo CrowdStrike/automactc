@@ -43,11 +43,11 @@ def module():
     output = data_writer(_modName, headers)
 
     user_inputdir = glob.glob(os.path.join(inputdir, "Users/*"))
-    user_inputdir.append(os.path.join(inputdir, "var/root"))
+    user_inputdir += glob.glob(os.path.join(inputdir, "var/*"))
 
     spotlight_path = 'Library/Application Support/com.apple.spotlight.Shortcuts'
+    
     for user_home in user_inputdir:
-
         sl_path = os.path.join(user_home, spotlight_path)
         u_spotlight = glob.glob(sl_path)
         if len(u_spotlight) == 0:
@@ -58,6 +58,7 @@ def module():
                 spotlight_data = plistlib.readPlist(file)
                 for k, v in spotlight_data.items():
                     user = os.path.basename(user_home)
+                    log.debug("Going to parse Spotlight shortcuts under {0} user.".format(user))
                     shortcut = k
                     display_name = spotlight_data[k]['DISPLAY_NAME']
                     last_used = spotlight_data[k]['LAST_USED'].isoformat() + "Z"

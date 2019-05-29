@@ -15,6 +15,7 @@ Downloads.plist for each user on disk.
 from common.functions import stats2
 from common.functions import read_bplist
 from common.functions import cocoa_time
+from common.functions import multiglob
 
 # IMPORT STATIC VARIABLES FROM MAIN
 from __main__ import inputdir
@@ -218,10 +219,17 @@ def module(safari_location):
 
     for c in safari_location:
         userpath = c.split('/')
-        userindex = len(userpath) - 1 - userpath[::-1].index('Users') + 1
+        if 'Users' in userpath:
+            userindex = len(userpath) - 1 - userpath[::-1].index('Users') + 1
+        else:
+            userindex = len(userpath) - 1 - userpath[::-1].index('var') + 1
         user = userpath[userindex]
 
         log.debug("Starting parsing for Safari under {0} user.".format(user))
+
+        if not os.path.exists(os.path.join(c, 'History.db')):
+            log.debug("Did not find History.db under {0} user.".format(user))
+            continue
 
         history_db = connect_to_db(os.path.join(c, 'History.db'),'history_visits')
         recently_closed_plist = os.path.join(c, 'RecentlyClosedTabs.plist')
@@ -244,6 +252,5 @@ if __name__ == "__main__":
     print "Exiting."
     sys.exit(0)
 else:
-    safari_location = glob.glob(
-        os.path.join(inputdir, 'Users/*/Library/Safari/'))
+    safari_location = multiglob(inputdir, ['Users/*/Library/Safari/', 'private/var/*/Library/Safari'])
     module(safari_location)
