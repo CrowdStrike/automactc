@@ -14,6 +14,7 @@ from itertools import groupby
 from operator import itemgetter
 from collections import OrderedDict
 from stat import *
+from pwd import getpwuid
 from datetime import datetime, timedelta
 from codesign import CodeSignChecker
 from importlib import import_module
@@ -177,18 +178,38 @@ def stats2(file,oMACB=False):
 	try:
 		stat = os.lstat(file)
 		statrecord = OrderedDict((h, '') for h in fields)
-		mode = stat.st_mode
 
-		if S_ISDIR(mode):
-			statrecord['mode'] = "Directory"
-		elif S_ISREG(mode):
-			statrecord['mode'] = "Regular File"
-		else:
-			statrecord['mode'] = "Other"
+		try:
+			mode = stat.st_mode
+			if S_ISDIR(mode):
+				statrecord['mode'] = "Directory"
+			elif S_ISREG(mode):
+				statrecord['mode'] = "Regular File"
+			else:
+				statrecord['mode'] = "Other"
+		except:
+			log.debug("Failed to get file stat 'mode': {0}: {1}".format(file, [traceback.format_exc()]))
+			statrecord['mode'] = "ERROR"
 
-		statrecord['uid'] = stat.st_uid
-		statrecord['gid'] = stat.st_gid
-		statrecord['size'] = stat.st_size
+		try:
+			statrecord['uid'] = stat.st_uid
+			statrecord['gid'] = stat.st_gid
+		except:
+			log.debug("Failed to get file owner info: {0}: {1}".format(file, [traceback.format_exc()]))
+			statrecord['uid'] = "ERROR"
+			statrecord['gid'] = "ERROR"
+
+		try:
+			statrecord['owner'] = getpwuid(stat.st_uid).pw_name
+		except:
+			log.debug("Failed to get file owner info: {0}: {1}".format(file, [traceback.format_exc()]))
+			statrecord['owner'] = "ERROR"
+
+		try:
+			statrecord['size'] = stat.st_size
+		except:
+			log.debug("Failed to get file size: {0}: {1}".format(file, [traceback.format_exc()]))
+			statrecord['size'] = "ERROR"
 
 		statrecord['name'] = os.path.basename(file)
 		path = os.path.dirname(file)
@@ -197,13 +218,25 @@ def stats2(file,oMACB=False):
 			statrecord['name'] = ''
 		elif statrecord['mode'] == "Regular File":
 			path = path+'/'
+		elif statrecord['mode'] == 'ERROR':
+			path = os.path.join(path,statrecord['name'])
+			statrecord['name'] = ''
 		statrecord['path'] = path.replace('//','/').replace('//','/')
 
-		statrecord['mtime'] = time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime(stat.st_mtime))
-		statrecord['atime'] = time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime(stat.st_atime))
-		statrecord['ctime'] = time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime(stat.st_ctime))
-		statrecord['btime'] = time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime(stat.st_birthtime))
+		try:
+			statrecord['mtime'] = time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime(stat.st_mtime))
+			statrecord['atime'] = time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime(stat.st_atime))
+			statrecord['ctime'] = time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime(stat.st_ctime))
+			statrecord['btime'] = time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime(stat.st_birthtime))
+		except:
+			log.debug("Failed to get file timestamp info: {0}: {1}".format(file, [traceback.format_exc()]))
+			statrecord['mtime'] = "ERROR"
+			statrecord['atime'] = "ERROR"
+			statrecord['ctime'] = "ERROR"
+			statrecord['btime'] = "ERROR"
+			
 	except:
+		log.debug("Failed to stat file: {0}: {1}".format(file, [traceback.format_exc()]))
 		statrecord = OrderedDict((h, 'ERROR') for h in fields)
 		statrecord['path'] = file
 	
