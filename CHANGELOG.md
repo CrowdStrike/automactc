@@ -60,28 +60,26 @@
 * Fixed a bug with default directory exclusions in forensic mode. 
 * Added file owner metadata to output.
 
-## Autoruns v. 1.0.1 (2019-04-12)
+## Autoruns v. 1.0.2 (2019-06-03)
 * Added parsing for user profiles under /private/var.
+* Added logic to correctly pull program name with location from launch agent plists that have both Program and ProgramArguments (frequently found in /System/Library/LaunchDaemons). This fix eliminates several file-not-found errors on hashing and code signa
 
-## Bash v. 1.0.1 (2019-04-12)
+## Bash v. 1.0.2 (2019-06-03)
 * Added parsing for user profiles under /private/var.
+* Reduced volume of debug messages produced when history files were NOT found under a user profile.
 
 ## MRU v. 1.0.2 (2019-05-28)
 * Added parsing for user profiles under /private/var.
 * Now extracting and adding username to output, based on MRU file location.
 
-## Quarantines v. 1.0.1 (2019-04-12)
+## Quarantines v. 1.0.2 (2019-06-03)
 * Added parsing for user profiles under /private/var.
 * Added a fix for pulling the correct User profile when using forensic mode and a mount point under /Users/.
+* Bugfixes, added import for multiglob from functions.py.
 
-## Spotlight v. 1.0.1 (2019-04-12)
+## Spotlight v. 1.0.2 (2019-06-03)
 * Added parsing for user profiles under /private/var.
-
-## Terminalstate v. 1.0.0 (2019-04-12)
-* Added new module to parse Terminal savedState files under each user profile. 
-
-## Auditlog v. 1.0.0 (2019-05-06)
-* Added new module to parse audit log files under /private/var/audit. 
+* Reduced volume of debug messages produced when spotlight history files were NOT found under a user profile.
 
 ## common/functions.py (2019-05-28)
 * Improved logic for the stats2 function.

@@ -98,6 +98,7 @@ def asl_parse(logfile, logdata, headers, output):
             record['pid'] = m.group('PID')
             record['message'] = m.group('message')
 
+            output.write_entry(record.values())
 
 
 def module():
@@ -111,7 +112,6 @@ def module():
 
     if len(varlogasl_inputdir) == 0:
         log.debug("Files not found in: {0}".format(asl_loc))
-        
 
     for asllog in varlogasl_inputdir:
         FNULL = open(os.devnull, 'w')

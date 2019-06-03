@@ -13,6 +13,7 @@ A module intended to parse the QuarantineEventsV2 database.
 # IMPORT FUNCTIONS FROM COMMON.FUNCTIONS
 from common.functions import cocoa_time
 from common.functions import query_db
+from common.functions import multiglob
 
 # IMPORT STATIC VARIABLES FROM MAIN
 from __main__ import inputdir
@@ -55,7 +56,10 @@ def module():
         data = query_db(i, qry, outputdir)
 
         userpath = i.split('/')
-        userindex = len(userpath) - 1 - userpath[::-1].index('Users') + 1
+        if 'Users' in userpath:
+            userindex = len(userpath) - 1 - userpath[::-1].index('Users') + 1
+        else:
+            userindex = len(userpath) - 1 - userpath[::-1].index('var') + 1
         user = userpath[userindex]
 
         for item in data:

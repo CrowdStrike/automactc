@@ -195,25 +195,33 @@ def parse_LaunchAgentsDaemons(headers, output):
                 record['prog_name'] = 'ERROR'
 
             # Try to get ProgramArguments if present, or Program, from each plist.
-            try: 
+            if 'Program' in p and 'ProgramArguments' in p:
                 prog_args = p['ProgramArguments']
-                program = p['ProgramArguments'][0]
+                program = p['Program']
                 record['program'] = program
-                
+
                 if len(prog_args) > 1:
                     record['args'] = ' '.join(p['ProgramArguments'][1:])
-            except (KeyError, IndexError), e:
-                try:
-                    program = p['Program']
+            else:
+                try: 
+                    prog_args = p['ProgramArguments']
+                    program = p['ProgramArguments'][0]
                     record['program'] = program
-                except:
-                    log.debug("Cannot extract 'Program' or 'ProgramArguments' from plist: {0}".format(i))
+                    
+                    if len(prog_args) > 1:
+                        record['args'] = ' '.join(p['ProgramArguments'][1:])
+                except (KeyError, IndexError), e:
+                    try:
+                        program = p['Program']
+                        record['program'] = program
+                    except:
+                        log.debug("Cannot extract 'Program' or 'ProgramArguments' from plist: {0}".format(i))
+                        program = None
+                        record['program'] = 'ERROR'
+                        record['args'] = 'ERROR'
+                except Exception, e:
+                    log.debug('Could not parse plist {0}: {1}'.format(i, [traceback.format_exc()]))
                     program = None
-                    record['program'] = 'ERROR'
-                    record['args'] = 'ERROR'
-            except Exception, e:
-                log.debug('Could not parse plist {0}: {1}'.format(i, [traceback.format_exc()]))
-                program = None
 
             # If program is ID'd, run additional checks. 
             if program:
