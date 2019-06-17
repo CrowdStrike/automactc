@@ -110,7 +110,7 @@ def pull_download_history(history_db, user, profile, downloads_output, downloads
     try:
         downloads_data = sqlite3.connect(history_db).cursor().execute(
 
-            'SELECT url,group_concat(content),dateAdded FROM moz_annos \
+            'SELECT url,group_concat(content),dateAdded,lastModified FROM moz_annos \
             LEFT JOIN moz_places ON moz_places.id = moz_annos.place_id \
             GROUP BY place_id'
 
@@ -131,9 +131,13 @@ def pull_download_history(history_db, user, profile, downloads_output, downloads
         record['profile'] = profile
         record['download_url'] = item[0]
         record['download_path'] = item[1].split(',')[0]
-        record['download_started'] = firefox_time(item[2]).split('.')[0]+'Z'
-        record['download_finished'] = firefox_time(int(item[1].split(',')[2].split(':')[1])*1000).split('.')[0]+'Z'
-        record['download_totalbytes'] = item[1].split(',')[3].split(':')[1].replace('}','')
+        record['download_started'] = firefox_time(item[2])
+        record['download_finished'] = firefox_time(item[3])
+        if len(item[1].split(',')) >= 4:
+            record['download_totalbytes'] = item[1].split(',')[3].split(':')[1].replace('}','')
+
+        else:
+            record['download_totalbytes'] = 'N/A'
 
         downloads_output.write_entry(record.values())
 
@@ -216,9 +220,9 @@ def module(firefox_location):
 
         history_db = connect_to_db(os.path.join(c, 'places.sqlite'),'moz_places')
 
-        # If the database cannot be accessed, or if the main table necessary 
+        # If the database cannot be accessed, or if the main table necessary
         # for parsing (moz_places) is unavailable,
-        # fail gracefully. 
+        # fail gracefully.
         if history_db:
             pull_visit_history(history_db, user, profile, urls_output, urls_headers)
             pull_download_history(history_db, user, profile, downloads_output, downloads_headers)
