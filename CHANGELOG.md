@@ -14,13 +14,11 @@
 * Switched precedence of LocalHostName and HostName when pulling together the output file prefix.
 * Added argument to override the mount point error.
 
-## Systeminfo v. 1.0.3 (2019-05-28)
+## Systeminfo v. 1.0.4 (2019-07-30)
 
-* Fixed a bug where module failed due to an AttributeError produced when computer_name was None but still tried to encode it.
-* Will now pull LocalHostName from the preferences.plist rather than from the full output filename prefix (in case the latter fails for some reason)
-* Fixed a bug where the module would fail if it couldn't successfully get the serial number.
-* Added logic to try to pull timezone from .GlobalPreferences.plist if running in forensic mode against a mounted image.
-* Added a debug message for failures to extract system serial number.
+* Added a check for the resolve location of /etc/localtime to find the timezone on forensic images.
+* If no timezone is found in GlobalPreferences or /etc/localtime it will gracefully fail.
+* Added Gatekeeper status and SIP status for live system analysis.
 
 ## Chrome v. 1.0.4 (2019-05-28)
 * Added more verbose debug messages. Fix for Issue #1.
@@ -34,8 +32,8 @@
 * Added logic to capture history from any users directories in /private/var/.
 * Added logic to produce a debug message when a History.db file is not found, rather than a "database could not be parsed" one.
 
-## Firefox v. 1.0.1 (2019-03-22)
-* Added a fix for pulling the correct User profile when using forensic mode and a mount point under /Users/.
+## Firefox v. 1.0.2 (2019-07-30)
+* Fixed a bug where the sqlite error thrown by places.sqlite was not triggering the module to try to copy the file and then read.
 
 ## Quicklook v 1.0.1 (2019-03-22)
 * Handle OSVersion cleanly if not detected at initial runtime.
@@ -77,9 +75,15 @@
 * Added a fix for pulling the correct User profile when using forensic mode and a mount point under /Users/.
 * Bugfixes, added import for multiglob from functions.py.
 
-## Spotlight v. 1.0.2 (2019-06-03)
+## Spotlight v. 1.0.2 (2019-04-12)
 * Added parsing for user profiles under /private/var.
 * Reduced volume of debug messages produced when spotlight history files were NOT found under a user profile.
+
+## Terminalstate v. 1.0.0 (2019-04-12)
+* Added new module to parse Terminal savedState files under each user profile. 
+
+## Auditlog v. 1.0.0 (2019-05-06)
+* Added new module to parse audit log files under /private/var/audit. 
 
 ## common/functions.py (2019-05-28)
 * Improved logic for the stats2 function.
