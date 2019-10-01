@@ -83,6 +83,7 @@ While the default behavior is to generate a tarball, use of the -nt flag will pr
 	- ssh (parsing known_hosts and authorized_keys files for each user)
 	- syslog (parsing system.log files)
 	- systeminfo (basic system identification, such as current IP address, serial no, hostname)
+	- terminalstate (parsing Terminal savedState files)
 	- users (listing present and deleted users on the system)
 	- utmpx (listing user sessions on terminals)
 
