@@ -79,7 +79,7 @@
 * Added parsing for user profiles under /private/var.
 * Reduced volume of debug messages produced when spotlight history files were NOT found under a user profile.
 
-## Terminalstate v. 1.0.0 (2019-04-12)
+## Terminalstate v. 1.0.0 (2019-10-01)
 * Added new module to parse Terminal savedState files under each user profile. 
 
 ## Auditlog v. 1.0.0 (2019-05-06)
@@ -89,3 +89,5 @@
 * Improved logic for the stats2 function.
 * Added logic to stats2 to pull file owner metadata.
 
+## common/Crypto (2019-10-01)
+* Added dependencies for Terminalstate module.
