@@ -3,8 +3,8 @@
 import ctypes
 import ctypes
 import ctypes.util
-import Foundation
-import objc
+#import Foundation
+# import objc
 
 class CodeSignChecker(object):
 

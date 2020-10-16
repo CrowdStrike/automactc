@@ -1,17 +1,15 @@
 #!/usr/bin/env python
 
 '''
-@ author: Kshitij Kumar
-@ email: kshitijkumar14@gmail.com, kshitij.kumar@crowdstrike.com
 
 @ purpose:
 
-A module intended to parse the InstallHistory.plist file. 
+A module intended to parse the InstallHistory.plist file.
 
 '''
 
 # IMPORT FUNCTIONS FROM COMMON.FUNCTIONS
-from common.functions import stats2
+from .common.functions import stats2
 
 # IMPORT STATIC VARIABLES FROM MAIN
 from __main__ import inputdir
@@ -49,7 +47,13 @@ def module():
         log.debug("File not found: {0}".format(installhistory_loc))
 
     for file in installhistory_list:
-        installhistory = plistlib.readPlist(file)
+        installhistoryfile = open(file, 'rb')
+        try:
+            installhistory = plistlib.load(installhistoryfile)
+        except AttributeError as e:
+            log.debug(e)
+            log.debug("Running python 2 code for this.")
+            installhistory = plistlib.readPlist(installhistoryfile)
 
         for i in range(len(installhistory)):
             record = OrderedDict((h, '') for h in headers)
@@ -59,14 +63,16 @@ def module():
             record['display_name'] = installhistory[i]['displayName']
             record['package_identifiers'] = installhistory[i]['packageIdentifiers']
             record['process_name'] = installhistory[i]['processName']
-
-            line = [x.encode('utf-8') if isinstance(x, unicode) else x for x in record.values()]
+            try:
+                line = [x.encode('utf-8') if isinstance(x, unicode) else x for x in record.values()]
+            except NameError as e:
+                line = [x if isinstance(x, str) else x for x in record.values()]
             output.write_entry(line)
 
 
 if __name__ == "__main__":
-    print "This is an AutoMacTC module, and is not meant to be run stand-alone."
-    print "Exiting."
+    print("This is an AutoMacTC module, and is not meant to be run stand-alone.")
+    print("Exiting.")
     sys.exit(0)
 else:
     module()

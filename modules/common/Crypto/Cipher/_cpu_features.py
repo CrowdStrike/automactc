@@ -28,7 +28,7 @@
 # POSSIBILITY OF SUCH DAMAGE.
 # ===================================================================
 
-from _raw_api import load_pycryptodome_raw_lib
+from ._raw_api import load_pycryptodome_raw_lib
 
 
 _raw_cpuid_lib = load_pycryptodome_raw_lib("Crypto.Util._cpuid_c",

@@ -34,8 +34,8 @@ Ciphertext Block Chaining (CBC) mode.
 
 __all__ = ['CbcMode']
 
-from py3compat import _copy_bytes
-from _raw_api import (load_pycryptodome_raw_lib, VoidPointer,
+from .py3compat import _copy_bytes
+from ._raw_api import (load_pycryptodome_raw_lib, VoidPointer,
                                   create_string_buffer, get_raw_buffer,
                                   SmartPointer, c_size_t, c_uint8_ptr,
                                   is_writeable_buffer)

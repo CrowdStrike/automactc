@@ -1,20 +1,18 @@
 #!/usr/bin/env python
 
 '''
-@ author: Kshitij Kumar
-@ email: kshitijkumar14@gmail.com, kshitij.kumar@crowdstrike.com
 
 @ purpose:
 
 A module intended to enumerate both deleted and current user profiles on
-the system. This module will also determine the last logged in user, 
+the system. This module will also determine the last logged in user,
 and identify administrative users.
 
 '''
 
 # IMPORT FUNCTIONS FROM COMMON.FUNCTIONS
-from common.functions import stats2
-from common.functions import read_bplist
+from .common.functions import stats2
+from .common.functions import read_bplist
 
 # IMPORT STATIC VARIABLES FROM MAIN
 from __main__ import inputdir
@@ -35,7 +33,7 @@ import logging
 import glob
 import traceback
 import subprocess
-from dateutil import parser
+from .common.dateutil import parser
 from collections import OrderedDict
 
 _modName = __name__.split('_')[-2]
@@ -62,7 +60,7 @@ def module():
     else:
         try:
             _deletedusers = read_bplist(_deletedusers_plist)[0]['deletedUsers']
-        except Exception, e:
+        except Exception as e:
             log.debug("Could not parse: {0}".format(_deletedusers_plist))
             _deletedusers = []
 
@@ -102,8 +100,8 @@ def module():
     _liveusers = glob.glob((os.path.join(inputdir, 'Users/*')))
     _privateusers = glob.glob((os.path.join(inputdir, 'private/var/*')))
 
-    not_users = ['.localized', 'Shared', 'agentx', 'at', 'audit', 'backups', 'db', 'empty', 
-                 'folders', 'install', 'jabberd', 'lib', 'log', 'mail', 'msgs', 'netboot', 
+    not_users = ['.localized', 'Shared', 'agentx', 'at', 'audit', 'backups', 'db', 'empty',
+                 'folders', 'install', 'jabberd', 'lib', 'log', 'mail', 'msgs', 'netboot',
                  'networkd', 'rpc', 'run', 'rwho', 'spool', 'tmp', 'vm', 'yp', 'ma']
 
     _allpossibleusers = [i for i in _liveusers + _privateusers if os.path.basename(i) not in not_users]
@@ -122,19 +120,19 @@ def module():
     except OSError:
         log.debug("Could not access dslocal: [{0}].".format([traceback.format_exc()]))
         users_dict = {}
-    except Exception, e:
+    except Exception as e:
         log.debug("Could not access dslocal [{0}].".format([traceback.format_exc()]))
         users_dict = {}
 
     # For live systems Mojave and above, use dscl to get the same dict.
     if not forensic_mode and len(users_dict) == 0:
         user_ids, e = subprocess.Popen(["dscl", ".", "-list", "Users", "UniqueID"], stdout=subprocess.PIPE).communicate()
-        for i in user_ids.split('\n'):
+        for i in user_ids.decode('utf-8').split('\n'):
             data = i.split(' ')
             users_dict[data[0]] = {'uid': data[-1], 'real_name' : ''}
 
         user_names, e = subprocess.Popen(["dscl", ".", "-list", "Users", "RealName"], stdout=subprocess.PIPE).communicate()
-        for i in user_names.split('\n'):
+        for i in user_names.decode('utf-8').split('\n'):
             data = i.split(' ')
             users_dict[data[0]]['real_name'] = ' '.join(filter(None, data[1:]))
     elif forensic_mode and len(users_dict) == 0:
@@ -154,7 +152,7 @@ def module():
     else:
         try:
             lastuser = read_bplist(_loginwindow)[0]['lastUserName']
-        except Exception, e:
+        except Exception as e:
             lastuser = ""
             log.debug("Could not parse: {0}".format(_loginwindow))
             log.error("Could not determine last logged in user.")
@@ -166,7 +164,7 @@ def module():
         username = os.path.basename(user_path)
         if username not in users_dict:
             continue
-        
+
         record = OrderedDict((h, '') for h in headers)
         oMACB = stats2(user_path, oMACB=True)
         record.update(oMACB)
@@ -215,8 +213,8 @@ def module():
 
 
 if __name__ == "__main__":
-    print "This is an AutoMacTC module, and is not meant to be run stand-alone."
-    print "Exiting."
+    print("This is an AutoMacTC module, and is not meant to be run stand-alone.")
+    print("Exiting.")
     sys.exit(0)
 else:
     module()

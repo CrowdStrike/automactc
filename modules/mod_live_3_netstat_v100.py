@@ -1,8 +1,6 @@
 #!/usr/bin/env python
 
 '''
-@ author: Kshitij Kumar
-@ email: kshitijkumar14@gmail.com, kshitij.kumar@crowdstrike.com
 
 @ purpose:
 
@@ -12,7 +10,7 @@ run on a live system.
 '''
 
 # IMPORT FUNCTIONS FROM COMMON.FUNCTIONS
-from common.functions import stats2
+from .common.functions import stats2
 
 # IMPORT STATIC VARIABLES FROM MAIN
 from __main__ import inputdir
@@ -45,7 +43,7 @@ def module():
 		if e:
 			pass
 		else:
-			netstat=netstat_out.encode('utf-8').split('\n')
+			netstat=netstat_out.decode().split('\n')
 			for l in netstat:
 				if not (l.startswith("Active") or l.startswith("Proto") or len(l) == 0):
 					item =  [x.lstrip(' ') for x in filter(None,l.split(' '))]
@@ -84,8 +82,8 @@ def module():
 
 
 if __name__ == "__main__":
-	print "This is an AutoMacTC module, and is not meant to be run stand-alone."
-	print "Exiting."
-	sys.exit(0)
+    print("This is an AutoMacTC module, and is not meant to be run stand-alone.")
+    print("Exiting.")
+    sys.exit(0)
 else:
 	module()

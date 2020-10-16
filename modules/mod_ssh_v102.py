@@ -1,8 +1,6 @@
 #!/usr/bin/env python
 
 '''
-@ author: Kshitij Kumar
-@ email: kshitijkumar14@gmail.com, kshitij.kumar@crowdstrike.com
 
 @ purpose:
 
@@ -12,8 +10,8 @@ files for each user on disk.
 '''
 
 # IMPORT FUNCTIONS FROM COMMON.FUNCTIONS
-from common.functions import stats2
-from common.functions import multiglob
+from .common.functions import stats2
+from .common.functions import multiglob
 
 # IMPORT STATIC VARIABLES FROM MAIN
 from __main__ import inputdir
@@ -74,8 +72,8 @@ def module():
             p, e = subprocess.Popen(["ssh-keygen", "-l", "-f", file], stderr=subprocess.STDOUT, stdout=subprocess.PIPE).communicate()
             record['src_name'] = os.path.basename(file)
 
-            if not e and not "is not a public key file" in p:
-                p = p.split('\n')
+            if not e and not "is not a public key file" in p.decode('utf-8'):
+                p = p.decode('utf-8').split('\n')
                 p = [x for x in p if len(x) > 0]
                 for i in p:
                     data = i.split(' ')
@@ -94,8 +92,8 @@ def module():
 
 
 if __name__ == "__main__":
-    print "This is an AutoMacTC module, and is not meant to be run stand-alone."
-    print "Exiting."
+    print("This is an AutoMacTC module, and is not meant to be run stand-alone.")
+    print("Exiting.")
     sys.exit(0)
 else:
     module()

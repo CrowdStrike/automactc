@@ -1,8 +1,6 @@
 #!/usr/bin/env python
 
 '''
-@ author: Kshitij Kumar
-@ email: kshitijkumar14@gmail.com, kshitij.kumar@crowdstrike.com
 
 @ purpose:
 
@@ -13,11 +11,11 @@ programs that are ultimate run on login or system startup.
 '''
 
 # IMPORT FUNCTIONS FROM COMMON.FUNCTIONS
-from common.functions import stats2
-from common.functions import read_bplist
-from common.functions import get_codesignatures
-from common.functions import multiglob
-from common.mac_alias import Bookmark
+from .common.functions import stats2
+from .common.functions import read_bplist
+from .common.functions import get_codesignatures
+from .common.functions import multiglob
+from .common.mac_alias import Bookmark
 
 # IMPORT STATIC VARIABLES FROM MAIN
 from __main__ import inputdir
@@ -104,7 +102,7 @@ def get_hashes(program):
                 hashes['sha256'] = shasum(program, size)
             except:
                 log.debug("Could not hash {0}: {1}".format(program, [traceback.format_exc()]))
-                hashes['sha256'] = 'ERROR'  
+                hashes['sha256'] = 'ERROR'
         if 'md5' in hash_alg:
             try:
                 hashes['md5'] = md5sum(program, size)
@@ -124,8 +122,11 @@ def parse_sandboxed_loginitems(headers, output):
         record['src_file'] = i
         record['src_name'] = "sandboxed_loginitems"
 
-        try: 
-            p = plistlib.readPlist(i)
+        try:
+            try:
+                p = plistlib.load(i)
+            except BplistError as e:
+                p = plistlib.readPlist(i)
         except:
             try:
                 p = read_bplist(i)
@@ -174,8 +175,11 @@ def parse_LaunchAgentsDaemons(headers, output):
         record['src_file'] = i
         record['src_name'] = "launch_items"
 
-        try: 
-            p = plistlib.readPlist(i)
+        try:
+            try:
+                 p = plistlib.load(i)
+            except:
+                p = plistlib.readPlist(i)
         except:
             try:
                 p = read_bplist(i)
@@ -187,7 +191,7 @@ def parse_LaunchAgentsDaemons(headers, output):
             if type(p) is list and len(p) > 0:
                 p = p[0]
 
-            # Try to get Label from each plist. 
+            # Try to get Label from each plist.
             try:
                 record['prog_name'] = p['Label']
             except KeyError:
@@ -203,14 +207,14 @@ def parse_LaunchAgentsDaemons(headers, output):
                 if len(prog_args) > 1:
                     record['args'] = ' '.join(p['ProgramArguments'][1:])
             else:
-                try: 
+                try:
                     prog_args = p['ProgramArguments']
                     program = p['ProgramArguments'][0]
                     record['program'] = program
-                    
+
                     if len(prog_args) > 1:
                         record['args'] = ' '.join(p['ProgramArguments'][1:])
-                except (KeyError, IndexError), e:
+                except (KeyError, IndexError) as e:
                     try:
                         program = p['Program']
                         record['program'] = program
@@ -219,11 +223,11 @@ def parse_LaunchAgentsDaemons(headers, output):
                         program = None
                         record['program'] = 'ERROR'
                         record['args'] = 'ERROR'
-                except Exception, e:
+                except Exception as e:
                     log.debug('Could not parse plist {0}: {1}'.format(i, [traceback.format_exc()]))
                     program = None
 
-            # If program is ID'd, run additional checks. 
+            # If program is ID'd, run additional checks.
             if program:
                 cs_check_path = os.path.join(inputdir, program.lstrip('/'))
                 record['code_signatures'] = str(get_codesignatures(cs_check_path, ncs))
@@ -231,10 +235,10 @@ def parse_LaunchAgentsDaemons(headers, output):
                 hashset = get_hashes(program)
                 record['sha256'] = hashset['sha256']
                 record['md5'] = hashset['md5']
-            
+
         else:
             errors = {k:'ERROR-CNR-PLIST' for k,v in record.items() if v  == ''}
-            record.update(errors)    
+            record.update(errors)
 
         output.write_entry(record.values())
 
@@ -291,8 +295,11 @@ def parse_loginitems(headers, output):
         record['src_file'] = i
         record['src_name'] = "login_items"
 
-        try: 
-            p = plistlib.readPlist(i)
+        try:
+            try:
+                p = plistlib.load(i)
+            except BplistError as e:
+                p = plistlib.readPlist(ifile)
         except:
             try:
                 p = read_bplist(i)
@@ -317,7 +324,7 @@ def parse_loginitems(headers, output):
                             l = int(c[i],16)
                             if l < len(c) and l > 2:
                                 test = os.path.join(inputdir, (''.join(c[i+1:i+l+1])).decode('hex'))
-                                try: 
+                                try:
                                     if not os.path.exists(test):
                                         continue
                                     else:
@@ -341,7 +348,7 @@ def parse_loginitems(headers, output):
                         data =  Bookmark.from_bytes(''.join(program).decode('hex'))
                         d = data.get(0xf081,default=None)
                         d =  ast.literal_eval(str(d).replace('Data',''))
-                        if d is not None:   
+                        if d is not None:
                             prog = d.split(';')[-1].replace('\x00','')
                             record['program'] = prog
                             cs_check_path = os.path.join(inputdir, prog.lstrip('/'))
@@ -367,8 +374,8 @@ def module():
 
 
 if __name__ == "__main__":
-    print "This is an AutoMacTC module, and is not meant to be run stand-alone."
-    print "Exiting."
+    print("This is an AutoMacTC module, and is not meant to be run stand-alone.")
+    print("Exiting.")
     sys.exit(0)
 else:
     module()

@@ -1,8 +1,6 @@
 #!/usr/bin/env python
 
 '''
-@ author: Kshitij Kumar
-@ email: kshitijkumar14@gmail.com, kshitij.kumar@crowdstrike.com
 
 @ purpose:
 
@@ -11,9 +9,9 @@ A module intended to parse the QuarantineEventsV2 database.
 '''
 
 # IMPORT FUNCTIONS FROM COMMON.FUNCTIONS
-from common.functions import cocoa_time
-from common.functions import query_db
-from common.functions import multiglob
+from .common.functions import cocoa_time
+from .common.functions import query_db
+from .common.functions import multiglob
 
 # IMPORT STATIC VARIABLES FROM MAIN
 from __main__ import inputdir
@@ -45,7 +43,7 @@ def module():
                'sender_address', 'typeno', 'origin_title', 'origin_title', 'origin_url', 'origin_alias']
     output = data_writer(_modName, headers)
 
-    qevents_list = multiglob(inputdir, ['Users/*/Library/Preferences/com.apple.LaunchServices.QuarantineEventsV2', 
+    qevents_list = multiglob(inputdir, ['Users/*/Library/Preferences/com.apple.LaunchServices.QuarantineEventsV2',
                                         'private/var/*/Library/Preferences/com.apple.LaunchServices.QuarantineEventsV2'])
     qry = 'SELECT * FROM LSQuarantineEvent'
 
@@ -77,13 +75,18 @@ def module():
             record['origin_url'] = item[9]
             record['origin_alias'] = item[10]
 
-            line = [x.encode('utf-8') if isinstance(x, unicode) else x for x in record.values()]
+            try:
+                line = [x.encode('utf-8') if isinstance(x, unicode) else x for x in record.values()]
+            except NameError as e:
+                log.debug(e)
+                log.debug("Running quarentines with python3 code")
+                line = [x if isinstance(x, str) else x for x in record.values()]
             output.write_entry(line)
 
 
 if __name__ == "__main__":
-    print "This is an AutoMacTC module, and is not meant to be run stand-alone."
-    print "Exiting."
+    print("This is an AutoMacTC module, and is not meant to be run stand-alone.")
+    print("Exiting.")
     sys.exit(0)
 else:
     module()

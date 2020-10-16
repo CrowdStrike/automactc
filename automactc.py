@@ -1,19 +1,15 @@
 #!/usr/bin/env python
 
 '''
-@ author: Kshitij Kumar
-@ email: kshitijkumar14@gmail.com, kshitij.kumar@crowdstrike.com
-
 @ purpose:
 
 The main framework which can be used to call and run automactc modules.
 
 Basic invocation: sudo /usr/bin/python2.7 automactc.py -m all
 
-By specifying the python path as above, the necessary libraries 
+By specifying the python path as above, the necessary libraries
 (natively available on macOS) should be found and loaded without issue.
 
-This program and all of its modules are 
 '''
 
 import sys
@@ -28,7 +24,6 @@ import sqlite3
 import plistlib
 import gzip
 import shutil
-import pytz
 import json
 import csv
 import traceback
@@ -41,8 +36,9 @@ from datetime import datetime
 from collections import OrderedDict
 from modules.common.functions import finditem
 from multiprocessing import Pool
+from modules.common.dep import six
 
-__version__ = '1.0.0.3'
+__version__ = '1.0.0.6'
 
 # Establish argparser.
 def parseArguments():
@@ -65,6 +61,7 @@ def parseArguments():
     general.add_argument('-fmt', '--output_format', help='toggle between csv and json output, defaults to csv', default='csv', action='store', required=False, choices=['csv', 'json'])
     general.add_argument('-np', '--no_low_priority', help='if flag is provided, will NOT run automactc with highest niceness (lowest CPU priority). high niceness is default', default=False, action='store_true', required=False)
     general.add_argument('-b', '--multiprocessing', help='if flag is provided, WILL multiprocess modules [WARNING: Experimental!]', default=False, action='store_true', required=False)
+    general.add_argument('-O', '--override_mount', help='if flag is provided, WILL bypass error where inputdir does not contain expected subdirs', default=False, action='store_true', required=False)
 
     console_log_args = parser.add_argument_group('console logging verbosity')
     console_logging_args = console_log_args.add_mutually_exclusive_group(required=False)
@@ -125,7 +122,13 @@ def gen_runlist(selected, available_mods):
         # Convert user selections to full module names to be run.
         unclean = [[x for x in available_mods if module in x] for module in selected]
         clean = [x for x in unclean if len(x) > 0]
+        runlist = []
+        # for x in clean[0]:
+        #     for i in selected:
+        #         if i == x.split('_')[-2]:
+        #             runlist.append(x)
         runlist = [x[0] for x in clean]
+        log.debug(runlist)
 
         # Raise errors for selected modules that are neither valid nor available to run.
         not_a_mod = [x for x in selected if not any(x in mod for mod in runlist)]
@@ -143,6 +146,7 @@ def gen_fullprefix(startTime):
     check_dbs = ['consolidated.db', 'cache_encryptedA.db', 'lockCache_encryptedA.db']
     serial_dbs = [loc for loc in g if any(loc.endswith(db) for db in check_dbs)]
     serial_query = 'SELECT SerialNumber FROM TableInfo;'
+    _serial = "SERROR"
 
     for db in serial_dbs:
         try:
@@ -150,25 +154,32 @@ def gen_fullprefix(startTime):
             _serial = cursor.execute(serial_query).fetchone()[0]
 
             log.debug("Retrieved serial number {0} from {1}.".format(_serial, db))
-
             break
 
         except sqlite3.OperationalError:
-            _serial = 'SERIALERROR'
-            log.error("Could not extract serial number from {0}: OperationalError.".format(db))
+            error = [x for x in traceback.format_exc().split('\n') if "OperationalError" in x]
+            log.debug("Could not connect [{0}].".format(error[0]))
+            if "database is locked" or "unable to open" in error[0]:
+                tmpdb = os.path.basename(db)+'-tmp'
+                log.debug("Trying to connect to db copied to temp location...")
 
-        except sqlite3.DatabaseError:
-            _serial = 'SERIALERROR'
-            log.error("Could not extract serial number from {0}: DatabaseError.".format(db))
-
-        except Exception, e:
-            _serial = 'SERIALERROR'
-            log.error("Could not extract serial number from {0}: {1}".format(db, [traceback.format_exc()]))
+                shutil.copyfile(db, os.path.join(outputdir, tmpdb))
+                db = os.path.join(outputdir, tmpdb)
+                try:
+                    cursor = sqlite3.connect(db).cursor()
+                    _serial = cursor.execute(serial_query).fetchone()[0]
+                    log.debug("Successfully connected.")
+                    os.remove(db)
+                    break
+                except:
+                    log.debug("Could not get serial number from {0}. Trying another directory.".format(db))
+                os.remove(db)
 
     # Get local hostname.
     if 'Volumes' not in inputdir and forensic_mode is not True:
         try:
             hostname_cmd, e = subprocess.Popen(["hostname"], stdout=subprocess.PIPE).communicate()
+            hostname_cmd = hostname_cmd.decode('utf-8')
             _hostname = hostname_cmd.rstrip('\n')
             log.debug("Retrieved hostname {0}.".format(_hostname))
         except Exception:
@@ -176,12 +187,16 @@ def gen_fullprefix(startTime):
             log.error("Could not retrieve hostname.")
     else:
         try:
-            pref_plist = os.path.join(inputdir, 'Library/Preferences/SystemConfiguration/preferences.plist')
-            preferences = plistlib.readPlist(pref_plist)
-            _hostname = finditem(preferences, 'LocalHostName')
+            pref_plist = open(os.path.join(inputdir, 'Library/Preferences/SystemConfiguration/preferences.plist'), 'rb')
+            try:
+                preferences = plistlib.load(pref_plist)
+            except Exception as e:
+                log.debug("Using python2 code to read preferences.plist.")
+                preferences = plistlib.readPlist(pref_plist)
+            _hostname = finditem(preferences, 'HostName')
             if not _hostname:
-                _hostname = finditem(preferences, 'HostName')
-                log.debug("Got hostname from the HostName key, rather than LocalHostName.")
+                _hostname = finditem(preferences, 'LocalHostName')
+                log.debug("Got hostname from the LocalHostName key, rather than HostName.")
         except Exception:
             _hostname = 'HNERROR'
             log.error("Could not retrieve hostname.")
@@ -190,7 +205,7 @@ def gen_fullprefix(startTime):
     if 'Volumes' not in inputdir and forensic_mode is not True:
         _ip, e = subprocess.Popen(["ifconfig", "en0"], stdout=subprocess.PIPE).communicate()
         try:
-            _ip = ''.join([i for i in _ip.split('\n\t') if i.startswith("inet ")]).split(' ')[1]
+            _ip = ''.join([i for i in _ip.decode().split('\n\t') if i.startswith("inet ")]).split(' ')[1]
             log.debug("Retrieved IPv4 address as {0}.".format(_ip))
         except IndexError:
             _ip = "255.255.255.255"
@@ -198,7 +213,7 @@ def gen_fullprefix(startTime):
     else:
         wifilog = os.path.join(inputdir, 'private/var/log/wifi.log')
         wifi_bzlogs = glob.glob(os.path.join(inputdir, 'private/var/log/wifi.log.*.bz2'))
-        
+
         try:
             wifi_data = open(wifilog, 'r').readlines()
             try:
@@ -217,16 +232,16 @@ def gen_fullprefix(startTime):
                 try:
                     wifi_bzdata, e = subprocess.Popen(["bzcat", i], stdout=subprocess.PIPE, stderr=subprocess.STDOUT).communicate()
                     wdata.append(wifi_bzdata.split('\n'))
-                except Exception, e:
+                except Exception as e:
                     log.debug("Could not parse {0}.".format(i))
         w = list(itertools.chain.from_iterable(wdata))
-        
+
         try:
             last_ip = [i for i in w if "Local IP" in i][0].rstrip()
             _ip = last_ip.split(' ')[-1]
             iptime = ' '.join(last_ip.split(' ')[0:4])
             log.debug("Last IP address {0} was assigned around {1} (local time).".format(_ip,iptime))
-        except Exception, e:
+        except Exception as e:
             log.debug("Could not get last IP from current or historical wifi.log files. Recorded at 255.255.255.255.")
             _ip = "255.255.255.255"
 
@@ -236,7 +251,7 @@ def gen_fullprefix(startTime):
     # Assemble prefix.
     full_prefix = '{0},{1},{2},{3}'.format(_prefix, _hostname, _ip, _runtime).replace(':', '_')
 
-    return full_prefix
+    return full_prefix, _serial
 
 def del_none(d):
     for key, value in list(d.items()):
@@ -275,8 +290,15 @@ class data_writer:
             with open(self.data_file_name, 'a') as data_file:
                 writer = csv.writer(data_file)
                 try:
+                    # if six.PY3:
+                    #     writer.writerow(data)
+                    # else:
+                    #     if isinstance(data[0], str):
+                    #         writer.writerow([unicode(s).encode('utf-8') for s in data])
+                    #     else:
+                    #         writer.writerow([s for s in data if s is not None])
                     writer.writerow(data)
-                except Exception, e:
+                except Exception as e:
                     self._log.debug("Could not write line {0} | {1}".format(data, [traceback.format_exc()]))
         elif self.datatype == 'json':
             zipped_data = del_none(dict(zip(self.headers, data)))
@@ -284,7 +306,7 @@ class data_writer:
                 try:
                     json.dump(zipped_data, data_file)
                     data_file.write('\n')
-                except Exception, e:
+                except Exception as e:
                     self._log.debug("Could not write line {0} | {1}".format(data, [traceback.format_exc()]))
 
 
@@ -317,7 +339,6 @@ def run_modules():
     pool = Pool()
     if module_inc_opts != ['']:
         runmods = gen_runlist(module_inc_opts, available_mods)
-
         if not multiprocessing:
             for module in runmods:
                 modExec(module)
@@ -344,7 +365,7 @@ def modExec(module):
     dn = '{0} (v{1})'.format(modName.upper(), modVers)
 
     try:
-        modStart = datetime.now(pytz.UTC)
+        modStart = datetime.utcnow()
         log.info("Running {0}".format(dn))
         modImport = 'modules.' + module
 
@@ -356,7 +377,7 @@ def modExec(module):
         except IndexError:
             pass
 
-        modEnd = datetime.now(pytz.UTC)
+        modEnd = datetime.utcnow()
         modRuntime = modEnd - modStart
         log.debug("{0} finished in {1}.".format(dn, modRuntime))
 
@@ -372,17 +393,35 @@ def modExec(module):
 # GZIP the tar archive.
 def gz_tar(full_prefix):
     tarfile = os.path.join(outputdir, full_prefix + '.tar')
-    with open(tarfile, 'rb') as f_in, gzip.open(tarfile + '.gz', 'wb') as f_out:
-        shutil.copyfileobj(f_in, f_out)
-    os.remove(tarfile)
+    try:
+        with open(tarfile, 'rb') as f_in, gzip.open(tarfile + '.gz', 'wb') as f_out:
+            shutil.copyfileobj(f_in, f_out)
+        os.remove(tarfile)
+    except FileNotFoundError as e:
+        log.error("Tarfile {0} was not generated. Module(s) run collected no info?".format(tarfile))
+        log.error(e)
 
     return tarfile + '.gz'
 
+# Subprocess remove quarantine xattrs
+def subq_remove(subqpath):
+    xattr_cmd = "xattr -d com.apple.quarantine " + subqpath
+    try:
+        subprocess.call(xattr_cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    except OSError:
+        return ''
 
 if __name__ == "__main__":
 
-    # Mark startime of program.
-    startTime = datetime.now(pytz.UTC)
+    # Remove quarantine xattrs for 10.15+
+    quarantine_remove = ['./modules/common/dep/_cffi_backend.cpython-37m-darwin.so',
+                        './modules/common/CryptoOld/Cipher/_AES.cpython-37m-darwin.so', 
+                        './modules/common/Crypto/Cipher/_raw_cbc.so', './modules/common/Crypto/Util/_cpuid_c.so',
+                        './modules/common/Crypto/Cipher/_raw_aes.so', './modules/common/Crypto/Cipher/_raw_aesni.so']
+    for i in quarantine_remove:
+        subq_remove(i)
+
+    startTime = datetime.utcnow()
 
     # Set environmental variable TZ to UTC.
     os.environ['TZ'] = 'UTC0'
@@ -410,6 +449,7 @@ if __name__ == "__main__":
     no_code_signatures = args.dir_no_code_signatures
     recurse_bundles = args.dir_recurse_bundles
     dirlist_no_multithreading = args.dir_no_multithreading
+    override_mount = args.override_mount
 
     # Establish filepath of amtc.
     dir_path = os.path.dirname(os.path.realpath(__file__))
@@ -425,30 +465,32 @@ if __name__ == "__main__":
 
     # Add functionality for --list argument to enumerate available mods.
     if args.list_modules:
-        print "Modules available for use:"
+        print( "Modules available for use:")
         for i in available_mods:
             _modName = i.split('_')[-2]
             _modVers = '.'.join(list(i.split('_')[-1][1:]))
-            print '\t {0} (v{1})'.format(_modName, _modVers)
+            print( '\t {0} (v{1})'.format(_modName, _modVers))
         sys.exit(0)
 
     # Check if at least -m all is invoked, else quit.
     if module_inc_opts == [''] and module_exc_opts == ['']:
-        print "You must provide at least '-m all' to run with all default settings. Exiting."
+        print( "You must provide at least '-m all' to run with all default settings. Exiting.")
         sys.exit(0)
 
     # Confirm that user is running script with root privileges.
     if os.geteuid() != 0:
-        print "You need to have root privileges to run this script.\nPlease try again, this time as 'sudo'. Exiting."
+        print( "You need to have root privileges to run this script.\nPlease try again, this time as 'sudo'. Exiting.")
         sys.exit(0)
 
     # Confirm that mount point in forensic mode has required directories - to see if the volume is actually mounted.
     mount_test = glob.glob(os.path.join(inputdir,'*'))
     required_dirs = ['Library', 'System', 'Users', 'Applications', 'Network']
     litmus = [i for i in mount_test if any(i.endswith(d) for d in required_dirs)]
-    if len(litmus) < len(required_dirs) and forensic_mode:
-        print "Mount point doesn't have any of the expected directories underneath. Check if the mount was completed successfully."
+    if len(litmus) < len(required_dirs) and forensic_mode and override_mount is False:
+        print( "Mount point doesn't have any of the expected directories underneath. Check if the mount was completed successfully.")
         sys.exit(0)
+    elif override_mount:
+        print( "Mount point doesn't have any of the expected directories underneath, but will proceeed despite this...")
 
     # Generate outputdir if it doesn't already exist.
     if os.path.isdir(outputdir) is False:
@@ -460,11 +502,11 @@ if __name__ == "__main__":
             logfilename = 'runtime{0}.json'.format(runID)
         else:
             logfilename = 'runtime{0}.log'.format(runID)
-        
+
         logfile = os.path.join(outputdir, logfilename)
     else:
         logfile = '/dev/null'
-    
+
     if output_format == "json":
         logging.basicConfig(
             level=logging.DEBUG,
@@ -505,8 +547,11 @@ if __name__ == "__main__":
 
     # Check if user is trying to run AMTC against mounted volume.
     if inputdir.startswith('/Volumes') and not forensic_mode:
-        print "Your input appears to begin with /Volumes."
-        chk_4n6 = raw_input("Are you trying to run automactc against a mounted volume? (y/n/q)")
+        print( "Your input appears to begin with /Volumes.")
+        try:
+            chk_4n6 = raw_input("Are you trying to run automactc against a mounted volume? (y/n/q)")
+        except NameError:
+            chk_4n6 = input("Are you trying to run automactc against a mounted volume? (y/n/q)")
         if chk_4n6.lower() in ['y', 'yes']:
             forensic_mode = True
         elif chk_4n6.lower() in ['n', 'no']:
@@ -515,14 +560,18 @@ if __name__ == "__main__":
             sys.exit(0)
 
     # Generate full prefix of the filenames.
-    full_prefix = gen_fullprefix(startTime)
+    full_prefix, serial = gen_fullprefix(startTime)
     filename_prefix = ', '.join(full_prefix.split(', ')[:4])
     log.debug("Full prefix: {0}".format(full_prefix))
 
 
     # Capture the OS version as a float for comparison tests in modules.
     try:
-        systemversion = plistlib.readPlist(os.path.join(inputdir, 'System/Library/CoreServices/SystemVersion.plist'))
+        pslistfile = open(os.path.join(inputdir, 'System/Library/CoreServices/SystemVersion.plist'), 'rb')
+        try:
+            systemversion = plistlib.load(pslistfile)
+        except AttributeError:
+            systemversion = plistlib.readPlist(pslistfile)
         OSVersion = finditem(systemversion, 'ProductVersion')
         log.debug("Got OSVersion: {0}".format(OSVersion))
     except IOError:
@@ -530,12 +579,12 @@ if __name__ == "__main__":
             try:
                 OSVersion, e = subprocess.Popen(["sw_vers", "-productVersion"], stdout=subprocess.PIPE).communicate()
                 log.debug("Got OSVersion: {0}".format(OSVersion))
-            except Exception, e:
+            except Exception as e:
                 log.error("Could not get OSVersion: {0}".format([traceback.format_exc()]))
         else:
             log.error("Could not get OSVersion: alternative method does not work on forensic image.")
             OSVersion = None
-    except Exception, e:
+    except Exception as e:
         log.error("Could not get OSVersion: {0}".format([traceback.format_exc()]))
         OSVersion = None
 
@@ -566,7 +615,7 @@ if __name__ == "__main__":
     run_modules()
 
     # Get program end time.
-    endTime = datetime.now(pytz.UTC)
+    endTime = datetime.utcnow()
     total_runTime = endTime - startTime
     log.info("Finished program at {0}.".format(endTime))
     log.info("Total runtime: {0}.".format(total_runTime))
@@ -581,6 +630,3 @@ if __name__ == "__main__":
     # Compress tar to tarball.
     if not no_tarball:
         tarball = gz_tar(full_prefix)
-        
-
-

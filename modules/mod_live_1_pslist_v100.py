@@ -1,8 +1,6 @@
 #!/usr/bin/env python
 
 '''
-@ author: Kshitij Kumar
-@ email: kshitijkumar14@gmail.com, kshitij.kumar@crowdstrike.com
 
 @ purpose:
 
@@ -12,7 +10,7 @@ live system.
 '''
 
 # IMPORT FUNCTIONS FROM COMMON.FUNCTIONS
-from common.functions import stats2
+from .common.functions import stats2
 
 # IMPORT STATIC VARIABLES FROM MAIN
 from __main__ import inputdir
@@ -30,7 +28,7 @@ import os
 import csv
 import subprocess
 import logging
-import dateutil.parser as parser
+from .common.dateutil import parser
 
 _modName = __name__.split('_')[-2]
 _modVers = '.'.join(list(__name__.split('_')[-1][1:]))
@@ -58,7 +56,7 @@ def module():
 					state = item[3]
 					proc_start = parser.parse(' '.join(item[5:9])).replace(tzinfo=None).isoformat()+'Z'
 					runtime = item[9]
-					cmd = ' '.join(item[10:]).encode("utf-8")
+					cmd = ' '.join(item[10:])
 					
 					line = [pid,ppid,user,state,proc_start,runtime,cmd]
 					output.write_entry(line)
@@ -67,8 +65,8 @@ def module():
 		log.error("Module did not run: input is not a live system!")
 
 if __name__ == "__main__":
-	print "This is an AutoMacTC module, and is not meant to be run stand-alone."
-	print "Exiting."
-	sys.exit(0)
+    print("This is an AutoMacTC module, and is not meant to be run stand-alone.")
+    print("Exiting.")
+    sys.exit(0)
 else:
 	module()

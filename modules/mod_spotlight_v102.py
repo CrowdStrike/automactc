@@ -1,8 +1,6 @@
 #!/usr/bin/env python
 
 '''
-@ author: Kshitij Kumar
-@ email: kshitijkumar14@gmail.com, kshitij.kumar@crowdstrike.com
 
 @ purpose:
 
@@ -13,7 +11,7 @@ well as the timestamp that it was last opened.
 '''
 
 # IMPORT FUNCTIONS FROM COMMON.FUNCTIONS
-from common.functions import multiglob
+from .common.functions import multiglob
 
 # IMPORT STATIC VARIABLES FROM MAIN
 from __main__ import inputdir
@@ -63,17 +61,17 @@ def module():
                 url = spotlight_data[k]['URL']
 
                 line_raw = [user, shortcut, display_name, last_used, url]
-                line = [x.encode('utf-8') for x in line_raw]
+                line = [x for x in line_raw]
 
                 output.write_entry(line)
 
-        except Exception, e:
+        except Exception as e:
             log.error("Could not parse: {0}".format(file))
 
 
 if __name__ == "__main__":
-    print "This is an AutoMacTC module, and is not meant to be run stand-alone."
-    print "Exiting."
+    print("This is an AutoMacTC module, and is not meant to be run stand-alone.")
+    print("Exiting.")
     sys.exit(0)
 else:
     module()

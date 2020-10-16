@@ -1,8 +1,6 @@
 #!/usr/bin/env python
 
 '''
-@ author: Kshitij Kumar
-@ email: kshitijkumar14@gmail.com, kshitij.kumar@crowdstrike.com
 
 @ purpose:
 
@@ -16,16 +14,16 @@ from collections import OrderedDict
 from stat import *
 from pwd import getpwuid
 from datetime import datetime, timedelta
-from codesign import CodeSignChecker
+from .codesign import CodeSignChecker
 from importlib import import_module
 
 import os
 import time
 import subprocess
-import ccl_bplist as bplist
+from . import ccl_bplist as bplist
 import csv
 import re
-import dateutil.parser as parser
+from .dateutil import parser
 from functools import wraps
 import errno
 import os
@@ -118,8 +116,12 @@ def get_codesignatures(fullpath, nocheck=False):
 			else:
 				return signers
 		except:
-			p = subprocess.Popen(['codesign', '-dv', '--verbose=2', 
-				str(fullpath)],stderr=subprocess.PIPE).communicate()[-1].split('\n')
+			try:
+				p = subprocess.Popen(['codesign', '-dv', '--verbose=2', 
+					str(fullpath)],stderr=subprocess.PIPE).communicate()[-1].decode().split('\n')
+			except:
+				p = subprocess.Popen(['codesign', '-dv', '--verbose=2', 
+					str(fullpath)],stderr=subprocess.PIPE).communicate()[-1].split('\n')
 			signers = [line.replace('Authority=','') for line in p if line.startswith('Authority=')]
 			if len(signers) == 0:
 				return ['Unsigned']
@@ -165,7 +167,10 @@ def read_bplist(file_location):
 
 # Read data from plist stored in a file.
 def read_stream_bplist(string):
-	w = buffer(string)
+	try:
+		w = buffer(string)
+	except NameError:
+		w = memoryview(string)
 	plist_array = bplist.load(io.BytesIO(w))
 	return plist_array
 

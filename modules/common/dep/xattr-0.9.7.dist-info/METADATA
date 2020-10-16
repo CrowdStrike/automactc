@@ -1,0 +1,34 @@
+Metadata-Version: 2.1
+Name: xattr
+Version: 0.9.7
+Summary: Python wrapper for extended filesystem attributes
+Home-page: http://github.com/xattr/xattr
+Author: Bob Ippolito
+Author-email: bob@redivi.com
+License: MIT License
+Platform: MacOS X
+Platform: Linux
+Platform: FreeBSD
+Platform: Solaris
+Classifier: Environment :: Console
+Classifier: Intended Audience :: Developers
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Natural Language :: English
+Classifier: Operating System :: MacOS :: MacOS X
+Classifier: Operating System :: POSIX :: Linux
+Classifier: Operating System :: POSIX :: BSD :: FreeBSD
+Classifier: Programming Language :: Python
+Classifier: Programming Language :: Python :: 2
+Classifier: Programming Language :: Python :: 3
+Classifier: Topic :: Software Development :: Libraries :: Python Modules
+Requires-Dist: cffi (>=1.0.0)
+
+
+Extended attributes extend the basic attributes of files and directories
+in the file system.  They are stored as name:data pairs associated with
+file system objects (files, directories, symlinks, etc).
+
+Extended attributes are currently only available on Darwin 8.0+ (Mac OS X 10.4)
+and Linux 2.6+. Experimental support is included for Solaris and FreeBSD.
+
+

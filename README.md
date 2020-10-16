@@ -5,13 +5,13 @@
 This is a modular forensic triage collection framework designed to access various forensic artifacts on macOS, parse them, and present them in formats viable for analysis. The output may provide valuable insights for incident response in a macOS environment. Automactc can be run against a live system or dead disk (as a mounted volume.)
 
 ## Requirements
-* Python 2.7 (Mac systems ship natively with Python 2.7. Python 3 support will be included in a future update)
-* MacOS target systems, for live collection (successfully tested on macOS  major releases 10.11 through 10.14)
-* MacOS analysis systems, for triage against a mounted disk image
+* Python 3.7.3 or earlier (It is also be backwards compatible with Python 2.7)
+* MacOS target systems, for live collection (successfully tested on macOS  major releases 10.11 through 10.15)
+* MacOS analysis systems, for triage against a mounted disk image (disk images from macOS 10.11 through 10.14 systems are supported)
 
 ## Basic usage
 
-At its simplest, you can run automactc with the following invocation. Note: automactc requires sudo privileges to run, and should be called specifically from /usr/bin/python2.7 to ensure full functionality.
+At its simplest, you can run automactc with the following invocation. Note: automactc requires sudo privileges to run, and should be called specifically from /usr/bin/python2.7 or /usr/bin/python3 to ensure full functionality.
 	
 	sudo /usr/bin/python2.7 automactc.py -m all
 
@@ -67,15 +67,18 @@ While the default behavior is to generate a tarball, use of the -nt flag will pr
 	- pslist (current process list at time of automactc run)
 	- lsof (current file handles open at time of automactc run)
 	- netstat (current network connections at time of automactc run)
-	- asl (parsed Apple System Log (.asl) files)
+	- asl (parsing of Apple System Log (.asl) files)
+	- auditlog (parsing of /private/var/audit/* files)
 	- autoruns (parsing of various persistence locations and plists)
 	- bash (parsing bash/.*_history files for all users)
 	- chrome (parsing chrome visit history and download history)
+	- cookies (parsing chrome and firefox cookies)
 	- coreanalytics (parsing program execution evidence produced by Apple diagnostics)
-	- dirlist (list hof files and directories across the disk)
+	- dirlist (list of files and directories across the disk)
 	- firefox (parsing firefox visit history and download history)
 	- installhistory (parsing program installation history)
 	- mru (parsing SFL and MRU plist files)
+	- netconfig (parsing airport and network interface settings)
 	- quarantines (parsing QuarantineEventsV2 database)
 	- quicklook (parsing Quicklooks database)
 	- safari (parsing safari visit history and download history)

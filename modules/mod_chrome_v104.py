@@ -1,8 +1,6 @@
 #!/usr/bin/env python
 
 '''
-@ author: Kshitij Kumar
-@ email: kshitijkumar14@gmail.com, kshitij.kumar@crowdstrike.com
 
 @ purpose:
 
@@ -12,11 +10,11 @@ user on disk.
 '''
 
 # IMPORT FUNCTIONS FROM COMMON.FUNCTIONS
-from common.functions import stats2
-from common.functions import chrome_time
-from common.functions import firefox_time
-from common.functions import multiglob
-from common.functions import finditem
+from .common.functions import stats2
+from .common.functions import chrome_time
+from .common.functions import firefox_time
+from .common.functions import multiglob
+from .common.functions import finditem
 
 # IMPORT STATIC VARIABLES FROM MAIN
 from __main__ import inputdir
@@ -38,11 +36,15 @@ import glob
 import sqlite3
 import shutil
 import logging
-import pytz
 import time
 import traceback
-import dateutil.parser as parser
+from .common.dateutil import parser
 from collections import OrderedDict
+from string import printable
+try:
+    from datetime import timezone
+except:
+    import pytz as timezone
 
 _modName = __name__.split('_')[-2]
 _modVers = '.'.join(list(__name__.split('_')[-1][1:]))
@@ -74,7 +76,7 @@ def connect_to_db(chrome_location):
         ver = get_chrome_version(history_db)
         log.debug("Successfully connected.")
     except sqlite3.OperationalError:
-        error = [x for x in traceback.format_exc().split('\n') if x.startswith("OperationalError")]
+        error = [x for x in traceback.format_exc().split('\n') if "OperationalError" in x]
         log.debug("Could not connect [{0}].".format(error[0]))
 
         if "database is locked" in error[0]:
@@ -88,12 +90,10 @@ def connect_to_db(chrome_location):
                 ver = get_chrome_version(history_db)
                 log.debug("Successfully connected.")
             except:
-                error = [x for x in traceback.format_exc().split('\n') if x.startswith("OperationalError")]
-                log.debug("Could not connect [{0}].".format(error[0]))
-
                 log.error("Module fatal error: cannot parse database.")
                 history_db = None
-
+                error = [x for x in traceback.format_exc().split('\n') if "OperationalError" in x]
+                log.debug("Could not connect [{0}].".format(error[0]))
     return history_db
 
 
@@ -112,7 +112,7 @@ def pull_visit_history(history_db, user, prof, urls_output, urls_headers):
         ).fetchall()
         log.debug("Success. Found {0} lines of data.".format(len(urls_data)))
 
-    except Exception, e:
+    except Exception as e:
         log.debug('Failed to run query: {0}'.format([traceback.format_exc()]))
 
         u_cnames = get_column_headers(history_db, 'urls')
@@ -130,12 +130,11 @@ def pull_visit_history(history_db, user, prof, urls_output, urls_headers):
     for item in urls_data:
         record = OrderedDict((h, '') for h in urls_headers)
         item = list(item)
-
         record['user'] = user
         record['profile'] = prof
         record['visit_time'] = chrome_time(item[0])
         record['url'] = item[1]
-        record['title'] = item[2].encode('utf-8')
+        record['title'] = "".join(filter(lambda char: char in printable, item[2]))
         record['visit_duration'] = time.strftime("%H:%M:%S", time.gmtime(item[3] / 1000000))
         record['visit_count'] = item[4]
         record['typed_count'] = item[5]
@@ -143,7 +142,7 @@ def pull_visit_history(history_db, user, prof, urls_output, urls_headers):
         search_term = item[7]
 
         if search_term is not None:
-            record['search_term'] = item[7].encode('utf-8')
+            record['search_term'] = item[7]
         else:
             record['search_term'] = ''
 
@@ -166,7 +165,7 @@ def pull_download_history(history_db, user, prof, downloads_output, downloads_he
 
         log.debug("Success. Found {0} lines of data.".format(len(downloads_data)))
 
-    except Exception, e:
+    except Exception as e:
         log.debug('Failed to run query: {0}'.format([traceback.format_exc()]))
 
         duc_cnames = get_column_headers(history_db, 'downloads_url_chains')
@@ -184,15 +183,15 @@ def pull_download_history(history_db, user, prof, downloads_output, downloads_he
 
         record['user'] = user
         record['profile'] = prof
-        record['current_path'] = item[0].encode('utf-8')
-        record['download_path'] = item[1].encode('utf-8')
+        record['current_path'] = item[0]
+        record['download_path'] = item[1]
         record['download_started'] = chrome_time(item[2])
         record['download_finished'] = chrome_time(item[3])
         record['danger_type'] = item[4]
         record['opened'] = item[5]
 
         if item[6] != '':
-            last_modified = parser.parse(item[6]).replace(tzinfo=pytz.UTC)
+            last_modified = parser.parse(item[6]).replace(tzinfo=timezone.utc)
             record['last_modified'] = last_modified.isoformat().replace('+00:00', 'Z')
         else:
             record['last_modified'] = ''
@@ -223,7 +222,29 @@ def parse_profiles(profile_data, user, profile_output, profile_headers):
 
         profile_output.write_entry(record.values())
 
+def get_extensions(extlist, user, prof, extensions_output, extensions_headers):
+    log.debug("Writing extension data...")
 
+    for ext in extlist:
+        with open(ext) as file:
+            data = json.loads(file.read())
+
+        #these json files have various different keys depending on the author
+
+        record = OrderedDict((h, '') for h in extensions_headers)
+        record['user'] = user
+        record['profile'] = prof
+        record['name'] = finditem(data, "name")
+        record['author'] = finditem(data, "author")
+        record['permissions'] = finditem(data, "permissions")
+        record['description'] = finditem(data, "description")
+        record['scripts'] = finditem(data, "scripts")
+        record['persistent'] = finditem(data, "persistent")
+        record['version'] = finditem(data, "version")
+
+        extensions_output.write_entry(record.values())
+
+    log.debug("Completed writing extension data.")
 
 def module(chrome_location):
 
@@ -248,7 +269,7 @@ def module(chrome_location):
                 jdata = json.loads(data.read())
                 chrome_ver = finditem(jdata, "stats_version")
                 log.debug("Chrome version {0} identified.".format(chrome_ver))
-            
+
                 profile_data = finditem(jdata, "info_cache")
                 parse_profiles(profile_data, user, profile_output, profile_headers)
 
@@ -268,6 +289,9 @@ def module(chrome_location):
                          'download_url','url']
     downloads_output = data_writer('browser_chrome_downloads', downloads_headers)
 
+    extensions_headers = ['user','profile','name','permissions','author','description','scripts','persistent','version']
+    extensions_output = data_writer('browser_chrome_extensions', extensions_headers)
+
     for prof in full_list:
 
         userpath = prof.split('/')
@@ -281,10 +305,14 @@ def module(chrome_location):
 
         history_db = connect_to_db(os.path.join(prof, 'History'))
 
-        if history_db:      
+        if history_db:
 
             pull_visit_history(history_db, user, profile, urls_output, urls_headers)
             pull_download_history(history_db, user, profile, downloads_output, downloads_headers)
+
+        extension_path = os.path.join(prof, 'Extensions/*/*/Manifest.json')
+        extension_list = glob.glob(extension_path)
+        get_extensions(extension_list, user, profile, extensions_output, extensions_headers)
 
         try:
             os.remove(os.path.join(outputdir, 'History-tmp'))
@@ -293,8 +321,8 @@ def module(chrome_location):
 
 
 if __name__ == "__main__":
-    print "This is an AutoMacTC module, and is not meant to be run stand-alone."
-    print "Exiting."
+    print("This is an AutoMacTC module, and is not meant to be run stand-alone.")
+    print("Exiting.")
     sys.exit(0)
 else:
     chrome_location = glob.glob(

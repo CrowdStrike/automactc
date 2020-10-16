@@ -1,28 +1,26 @@
 #!/usr/bin/env python
 
 '''
-@ author: Kshitij Kumar
-@ email: kshitijkumar14@gmail.com, kshitij.kumar@crowdstrike.com
 
 @ purpose:
 
 A module intended to parse SFL, SFL2, and other various MRU plist files.
 Thank you to Sarah Edwards and her tool macMRU-Parser for pointing me towards
-ccl_bplist and for her blog posts about deserializing the 
-NSKeyedArchiver plist format. Her tool can be found here: 
+ccl_bplist and for her blog posts about deserializing the
+NSKeyedArchiver plist format. Her tool can be found here:
 
 https://github.com/mac4n6/macMRU-Parser/blob/master/macMRU.py
 
-Borrowed some snippets and logic from the same. 
+Borrowed some snippets and logic from the same.
 License included under `licenses` directory as macMRU-LICENSE.txt.
 
 '''
 
 # IMPORT FUNCTIONS FROM COMMON.FUNCTIONS
-from common.functions import stats2
-from common.functions import read_bplist
-from common.functions import multiglob
-import common.ccl_bplist as ccl_bplist
+from .common.functions import stats2
+from .common.functions import read_bplist
+from .common.functions import multiglob
+from .common import ccl_bplist as ccl_bplist
 
 # IMPORT STATIC VARIABLES FROM MAIN
 from __main__ import inputdir
@@ -54,7 +52,7 @@ def parse_sfls(headers, output):
     sfl_list = multiglob(inputdir, ['Users/*/Library/Application Support/com.apple.sharedfilelist/*.sfl',
                           'Users/*/Library/Application Support/com.apple.sharedfilelist/*/*.sfl',
                           'private/var/*/Library/Application Support/com.apple.sharedfilelist/*/*.sfl'])
-    
+
     for mru_file in sfl_list:
 
         userpath = mru_file.split('/')
@@ -66,13 +64,13 @@ def parse_sfls(headers, output):
         try:
             if plist_objects["root"]["NS.objects"][1]["NS.keys"][0] == "com.apple.LSSharedFileList.MaxAmount":
                 numberOfItems = plist_objects["root"]["NS.objects"][1]["NS.objects"][0]
-        except Exception, e:
+        except Exception as e:
             pass
 
         try:
             if plist_objects["root"]["NS.keys"][2] == "items":
                 items = plist_objects["root"]["NS.objects"][2]["NS.objects"]
-        except Exception, e:
+        except Exception as e:
             log.debug('Could not parse SFL {0}: {1}'.format(mru_file, [traceback.format_exc()]))
             items = None
 
@@ -84,17 +82,17 @@ def parse_sfls(headers, output):
                 record['src_name'] = "SharedFileList"
                 try:
                     try:
-                        name = item["name"].encode('utf-8')
-                    except Exception, e:
+                        name = item["name"]
+                    except Exception as e:
                         name = ''
                     record['name'] = name
-                    record['item_index'] = str(n) 
+                    record['item_index'] = str(n)
                     record['order'] = item['order']
                     record['url'] = item['URL']['NS.relative']
 
-                except Exception, e:
+                except Exception as e:
                     log.debug("Could not parse SFL item: {0}".format(item))
-                
+
                 output.write_entry(record.values())
 
 
@@ -116,13 +114,13 @@ def parse_sfl2s(headers, output):
         try:
             if plist_objects["root"]["NS.objects"][1]["NS.keys"][0] == "com.apple.LSSharedFileList.MaxAmount":
                 numberOfItems = plist_objects["root"]["NS.objects"][1]["NS.objects"][0]
-        except Exception, e:
+        except Exception as e:
             pass
 
         try:
             if plist_objects["root"]["NS.keys"][0] == "items":
                 items = plist_objects["root"]["NS.objects"][0]["NS.objects"]
-        except Exception, e:
+        except Exception as e:
             log.debug('Could not parse SFL {0}: {1}'.format(mru_file, [traceback.format_exc()]))
             items = None
 
@@ -142,31 +140,37 @@ def parse_sfl2s(headers, output):
                     attributes = dict(zip(attribute_keys, attribute_values))
 
                     try:
-                        name = str(attributes['Name']).encode('utf-8')
+                        name = str(attributes['Name'])
                     except:
                         name = ''
 
                     if 'Bookmark' in attributes:
                         try:
                             url = [
-                                'file://' + x.split(';')[-1] for x in attributes['Bookmark'].split('\x00') if x != '' and ';' in x][0]
+                                'file://' + x.split(';')[-1] for x in attributes['Bookmark'].decode('latin-1').split('\x00') if x != '' and ';' in x][0]
                         except:
                             try:
-                                url = ', '.join(['file://' + x.split(';')[-1] for x in [x for x in attributes['Bookmark']['NS.data'].split('\x00') if x != '' and ';' in x]])
+                                url = ', '.join(['file://' + x.split(';')[-1] for x in [x for x in attributes['Bookmark']['NS.data'].decode('latin-1').split('\x00') if x != '' and ';' in x]])
                             except:
                                 try:
-                                    url = [x for x in attributes['Bookmark'].split('\x00') if x != '' and x.startswith('x')][0]
+                                    url = [x for x in attributes['Bookmark'].decode('latin-1').split('\x00') if x != '' and 'x' in x][0]
+                                except IndexError:
+                                    url = 'ERROR-EMPTY'
+                                    log.debug("Could not parse URL from {0}: {1}".format(mru_file, [traceback.format_exc()]))
                                 except:
+                                    #log.debug('Could not parse SFL {0}: {1}'.format(x, [traceback.format_exc()]))
                                     url = 'ERROR-COULDNOTPARSE'
+                                    log.debug("Could not parse URL from {0}: {1}".format(mru_file, [traceback.format_exc()]))
+
                     else:
                         url = 'ERROR-NODATA'
-                    
+
                     record['item_index'] = str(n)
                     record['name'] = name
                     record['url'] = url
-                
-                except Exception, e:
-                    log.debug("Could not parse SFL item: {0}".format(item))
+
+                except Exception as e:
+                    log.debug("Could not parse SFL2 item: {0}".format(item))
 
                 output.write_entry(record.values())
 
@@ -184,7 +188,7 @@ def parse_securebookmarks(headers, output):
 
         try:
             data = plistlib.readPlist(secure_bookmark_file)
-        except Exception, e:
+        except Exception as e:
             log.debug('Could not parse securebookmark file {0}: {1}'.format(secure_bookmark_file, [traceback.format_exc()]))
             data = None
 
@@ -197,7 +201,7 @@ def parse_securebookmarks(headers, output):
                 try:
                     record['url'] = k
                     record['name'] = k.split('/')[-1].encode('utf-8')
-                except Exception, e:
+                except Exception as e:
                     log.debug("Could not parse securebookmark item for key: {0}".format(k))
                 output.write_entry(record.values())
 
@@ -213,7 +217,7 @@ def parse_finderplists(headers, output):
 
         try:
             data = read_bplist(fplist)[0]
-        except Exception, e:
+        except Exception as e:
             log.debug('Could not parse finderplist {0}: {1}'.format(fplist, [traceback.format_exc()]))
             data = None
 
@@ -237,10 +241,11 @@ def parse_finderplists(headers, output):
                 record['user'] = user
                 try:
                     record['source_key'] = 'FXRecentFolders'
-                    record['name'] = i['name'].encode('utf-8')
+                    record['name'] = i['name']
                     bkmk = i['file-bookmark']
-                    record['url'] = 'file:///' + str(bkmk).split(';')[-1].split('\x00')[0]
-                except Exception, e:
+                    record['url'] = 'file:///' + bkmk.decode('latin-1').split(';')[-1].split('\x00')[0]
+                except Exception as e:
+                    log.debug("Could not parse finderplist item: {0}: {1}".format(i, [traceback.format_exc()]))
                     log.debug("Could not parse finderplist item: {0}".format(i))
                 output.write_entry(record.values())
 
@@ -251,9 +256,9 @@ def parse_finderplists(headers, output):
                 record['user'] = user
                 try:
                     record['url'] = i
-                    record['name'] = i.split('/')[-2].encode('utf-8')
+                    record['name'] = i.split('/')[-2]
                     record['source_key'] = 'RecentMoveAndCopyDestinations'
-                except Exception, e:
+                except Exception as e:
                     log.debug("Could not parse finderplist item: {0}: {1}".format(i, [traceback.format_exc()]))
                 output.write_entry(record.values())
 
@@ -266,10 +271,10 @@ def parse_sidebarplists(headers, output):
         userpath = sblist.split('/')
         userindex = userpath.index('Library') - 1
         user = userpath[userindex]
-        
+
         try:
             data = read_bplist(sblist)[0]
-        except Exception, e:
+        except Exception as e:
             log.debug('Could not parse sidebarplist {0}: {1}'.format(sblist, [traceback.format_exc()]))
             data = None
 
@@ -280,7 +285,7 @@ def parse_sidebarplists(headers, output):
                 record['src_name'] = "SidebarPlist"
                 record['user'] = user
                 try:
-                    record['name'] = i['Name'].encode('utf-8')
+                    record['name'] = i['Name']
                     if 'Bookmark' in i:
                         record['url'] = 'file:///' + str(i['Bookmark']).split('file:///')[1].split('\x00')[0]
                     record['source_key'] = 'VolumesList'
@@ -301,8 +306,8 @@ def module():
 
 
 if __name__ == "__main__":
-    print "This is an AutoMacTC module, and is not meant to be run stand-alone."
-    print "Exiting."
+    print("This is an AutoMacTC module, and is not meant to be run stand-alone.")
+    print("Exiting.")
     sys.exit(0)
 else:
     module()

@@ -38,11 +38,11 @@ Module's constants for the modes of operation supported with AES:
 import sys
 
 from . import _create_cipher
-from _raw_api import (load_pycryptodome_raw_lib,
+from ._raw_api import (load_pycryptodome_raw_lib,
                                   VoidPointer, SmartPointer,
                                   c_size_t, c_uint8_ptr)
 
-import _cpu_features
+from . import _cpu_features
 from os import urandom
 
 get_random_bytes = urandom

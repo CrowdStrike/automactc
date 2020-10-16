@@ -1,8 +1,7 @@
 #!/usr/bin/env python
+# coding: utf-8
 
 '''
-@ author: Kshitij Kumar
-@ email: kshitijkumar14@gmail.com, kshitij.kumar@crowdstrike.com
 
 @ purpose:
 
@@ -12,11 +11,15 @@ for each user on disk.
 '''
 
 # KEEP THIS - IMPORT FUNCTIONS FROM COMMON.FUNCTIONS
+from .common.dep import six
 from .common.functions import read_bplist
 from .common.functions import read_stream_bplist
 from .common.functions import multiglob
 from .common import ccl_bplist as bplist
-from .common.Crypto.Cipher import AES
+if six.PY3:
+    from .common.CryptoOld.Cipher import AES
+else:
+    from .common.Crypto.Cipher import AES
 
 
 # KEEP THIS - IMPORT STATIC VARIABLES FROM MAIN
@@ -58,6 +61,9 @@ def module():
 
     user_inputdir = multiglob(inputdir, ["Users/*/Library/Saved Application State/com.apple.Terminal.savedState/",
                                          "private/var/*/Library/Saved Application State/com.apple.Terminal.savedState/"])
+    if len(user_inputdir) <= 0:
+        log.info("No Terminal.savedState files were found")
+        return
 
     bplist.set_object_converter(bplist.NSKeyedArchiver_common_objects_convertor)
 
@@ -124,19 +130,19 @@ def module():
 
 
         # Parse each NSCR1000 block.
-        data_chunks = [i for i in data.split('NSCR1000') if i != '']
+        data_chunks = [i for i in data.decode('latin-1').split('NSCR1000') if i != '']
         datablock_index = 0
         for chunk in data_chunks:
             datablock_index += 1
-            (NSWindowID,) = struct.unpack('>I', chunk[0:4])
-            (blocksize,) = struct.unpack('>I', chunk[4:8])
+            (NSWindowID,) = struct.unpack('>I', chunk[0:4].encode('latin-1'))
+            (blocksize,) = struct.unpack('>I', chunk[4:8].encode('latin-1'))
             available = len(chunk)+8
             if available == blocksize:
-                datablock = chunk[8:blocksize]
+                datablock = chunk[8:blocksize].encode('latin-1')
                 if not NSWindowID in windows_data.keys() or not windows_data[NSWindowID]:
                     log.debug("Key not found in windows.plist for WindowID {0} (datablock {1}).".format(NSWindowID, str(datablock_index)))
                     continue
-                iv = None
+                iv = os.urandom(16)
                 key = windows_data[NSWindowID]
                 try:
                     cipher = AES.new(key, AES.MODE_CBC, iv)
@@ -147,8 +153,8 @@ def module():
                     continue
 
         # Carve and parse each binary plist from the decrypted blocks.
-                if 'bplist' in pt:
-                    header_off = pt.find("bplist")
+                if 'bplist'.encode() in pt:
+                    header_off = pt.find('bplist'.encode())
                     plist_size_hex = pt[header_off-4:header_off]
                     (plist_size,) = struct.unpack('>I', plist_size_hex)
                     plist_data = pt[header_off:header_off+plist_size]
@@ -161,7 +167,11 @@ def module():
                         record['user'] = user
                         record['window_id'] = NSWindowID
                         record['datablock'] = datablock_index
-                        record['window_title'] = ns_parsed['NSTitle'].encode('utf-8')
+
+                        if sys.version_info[0] >= 3:
+                            record['window_title'] = ns_parsed['NSTitle']
+                        else:
+                            record['window_title'] = ns_parsed['NSTitle'].encode('utf-8')
 
                         try:
                             record['tab_working_directory_url'] = ns_parsed['TTWindowState']['Window Settings'][0]["Tab Working Directory URL"]
@@ -177,10 +187,13 @@ def module():
                             terminal_data = ns_parsed['TTWindowState']['Window Settings'][0]["Tab Contents v2"]
                             indx = 0
                             for i in terminal_data:
-                                if type(i) == str:
+                                if type(i) == bytes:
                                     indx += 1
                                     record['line_index'] = str(indx)
-                                    record['line'] = i.decode('utf-8').encode('utf-8').rstrip()
+                                    try:
+                                        record['line'] = i.decode().rstrip()
+                                    except:
+                                        record['line'] = i.rstrip()
                                     _output.write_entry(record.values())
 
                         except KeyError:

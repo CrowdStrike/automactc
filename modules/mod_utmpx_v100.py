@@ -1,8 +1,6 @@
 #!/usr/bin/env python
 
 '''
-@ author: Eric John
-@ email: eric.john@crowdstrike.com
 
 @ purpose:
 
@@ -13,7 +11,7 @@ A module intended to read and parse the utmpx file located in
 '''
 
 # IMPORT FUNCTIONS FROM COMMON.FUNCTIONS
-from common.functions import stats2
+from .common.functions import stats2
 
 # IMPORT STATIC VARIABLES FROM MAIN
 from __main__ import inputdir
@@ -33,10 +31,10 @@ import csv
 import glob
 import datetime
 import logging
-import pytz
 
 from collections import OrderedDict
 from struct import Struct, calcsize, unpack_from
+from string import printable
 
 _modName = __name__.split('_')[-2]
 _modVers = '.'.join(list(__name__.split('_')[-1][1:]))
@@ -90,18 +88,17 @@ def module():
                 user, id, terminal_type, pid, logon_code, epoch, usec, host_id = unpack_from(UTMPX_STR, buf)
                 # Combine the timestamp fields
                 combo_time = datetime.datetime.utcfromtimestamp(epoch) + datetime.timedelta(microseconds=usec)
-                utc_combo = pytz.utc.localize(combo_time)
-                timestamp_formatted = utc_combo.strftime('%Y-%m-%dT%H:%M:%S.%fZ')
+                timestamp_formatted = combo_time.strftime('%Y-%m-%dT%H:%M:%S.%fZ')
 
-                if host_id.rstrip('\x00') == '':
+                if host_id.decode('utf-8').rstrip('\x00') == '':
                     host = "localhost"
                 else:
-                    host = host_id.rstrip('\x00')
+                    host = host_id.decode('utf-8').rstrip('\x00')
 
                 # Convert them to an OrderedDict and then create Values View
-                record['user'] = user.rstrip('\x00')
-                record['id'] = id
-                record['terminal_type'] = terminal_type.rstrip('\x00')
+                record['user'] = user.decode('utf-8').rstrip('\x00')
+                record['id'] = "".join(filter(lambda char: char in printable, id.decode('utf-8')))
+                record['terminal_type'] = terminal_type.decode('utf-8').rstrip('\x00')
                 record['pid'] = pid
                 record['logon_type'] = decode_logon(logon_code)
                 record['timestamp'] = timestamp_formatted
@@ -112,8 +109,8 @@ def module():
 
 
 if __name__ == "__main__":
-    print "This is an AutoMacTC module, and is not meant to be run stand-alone."
-    print "Exiting."
+    print("This is an AutoMacTC module, and is not meant to be run stand-alone.")
+    print("Exiting.")
     sys.exit(0)
 else:
     module()

@@ -1,20 +1,18 @@
 #!/usr/bin/env python
 
 '''
-@ author: Kshitij Kumar
-@ email: kshitijkumar14@gmail.com, kshitij.kumar@crowdstrike.com
 
 @ purpose:
 
-A module intended to parse the Quicklooks database for each user. 
+A module intended to parse the Quicklooks database for each user.
 
 '''
 
 # IMPORT FUNCTIONS FROM COMMON.FUNCTIONS
-from common.functions import stats2
-from common.functions import cocoa_time
-from common.functions import read_stream_bplist
-from common.functions import query_db
+from .common.functions import stats2
+from .common.functions import cocoa_time
+from .common.functions import read_stream_bplist
+from .common.functions import query_db
 
 # IMPORT STATIC VARIABLES FROM MAIN
 from __main__ import inputdir
@@ -29,7 +27,7 @@ from __main__ import full_prefix
 from __main__ import OSVersion
 from __main__ import data_writer
 
-
+import io
 import plistlib
 import sqlite3
 import traceback
@@ -39,6 +37,7 @@ import glob
 import logging
 import shutil
 from collections import OrderedDict
+from .common import ccl_bplist as bplist
 import time
 
 _modName = __name__.split('_')[-2]
@@ -77,15 +76,16 @@ def module():
     for qfile in qlist:
 
         uid = stats2(qfile)['uid']
-        
+
         data = query_db(qfile, ql_sql, outputdir)
 
         for item in data:
             item = list(item)
+
             record = OrderedDict((h, '') for h in headers)
             record['uid'] = uid
-            record['path'] = item[0].encode('utf-8')
-            record['name'] = item[1].encode('utf-8')
+            record['path'] = item[0]
+            record['name'] = item[1]
 
             if item[3]:
                 record['last_hit_date'] = cocoa_time(item[3])
@@ -98,22 +98,25 @@ def module():
                 record['hit_count'] = ''
 
             try:
-                plist_array = read_stream_bplist(item[4])
+                try:
+                    plist_array = read_stream_bplist(item[4])
+                except:
+                    plist_array = bplist.load(io.BytesIO(item[4]))
                 record['file_last_modified'] = cocoa_time(plist_array['date'])
                 record['generator'] = plist_array['gen']
                 try:
                     record['file_size'] = int(plist_array['size'])
                 except KeyError:
                     record['file_size'] = 'Error'
-            except Exception, e:
+            except Exception as e:
                 log.error("Could not parse: embedded binary plist for record {0}".format(record['name']))
 
             output.write_entry(record.values())
 
 
 if __name__ == "__main__":
-    print "This is an AutoMacTC module, and is not meant to be run stand-alone."
-    print "Exiting."
+    print("This is an AutoMacTC module, and is not meant to be run stand-alone.")
+    print("Exiting.")
     sys.exit(0)
 else:
     module()

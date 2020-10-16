@@ -1,8 +1,6 @@
 #!/usr/bin/env python
 
 '''
-@ author: Jai Musunuri
-@ email: jai.musunuri@crowdstrike.com
 
 @ purpose:
 
@@ -11,7 +9,7 @@ A module intended to read and parse .asl files on disk.
 '''
 
 # IMPORT FUNCTIONS FROM COMMON.FUNCTIONS
-from common.functions import stats2
+from .common.functions import stats2
 
 # IMPORT STATIC VARIABLES FROM MAIN
 from __main__ import inputdir
@@ -37,7 +35,11 @@ from itertools import groupby
 from operator import itemgetter
 from collections import OrderedDict
 from datetime import datetime, timedelta
-import dateutil.parser as parser
+try:
+    from past.builtins import range as xrange
+except:
+    pass
+from .common.dateutil import parser
 
 _modName = __name__.split('_')[-2]
 _modVers = '.'.join(list(__name__.split('_')[-1][1:]))
@@ -62,10 +64,11 @@ def asl_parse(logfile, logdata, headers, output):
 
     data = list(OrderedDict.fromkeys(sorted(data)))
     ranges = []
-    for key, group in groupby(enumerate(data), lambda (index, item): index - item):
-        group = map(itemgetter(1), group)
+    #for key, group in groupby(enumerate(data), lambda (index, item): index - item):
+    for group in enumerate(data):
+        #group = map(itemgetter(1), group)
         if len(group) > 1:
-            ranges.append(xrange(group[0], group[-1]))
+            ranges.append(range(group[0], group[-1]))
         else:
             ranges.append(group[0])
 
@@ -84,6 +87,9 @@ def asl_parse(logfile, logdata, headers, output):
         except TypeError:
             if not "NOTE:Most system logs have moved" in ''.join(chain):
                 log.debug("Line does not resemble an ASL entry: {0}.".format(chain))
+        except UnboundLocalError:
+            if len(u) > 0:
+                log.debug("No ASL data? {0}".format(u))
 
     for k, v in singlelines.items():
         line = v
@@ -117,18 +123,18 @@ def module():
         FNULL = open(os.devnull, 'w')
         asl_out, e = subprocess.Popen(
             ["syslog", "-f", asllog, '-T', 'utc.3'], stdout=subprocess.PIPE, stderr=subprocess.STDOUT).communicate()
-        if "Invalid Data Store" in asl_out:
+        if "Invalid Data Store" in asl_out.decode('utf-8'):
             log.debug("Could not parse {0}. Invalid Data Store error reported - file may be corrupted.".format(asllog))
             continue
         if not e:
-            oasllog = asl_out.split('\n')
+            oasllog = asl_out.decode('utf-8').split('\n')
             asl_parse(asllog, oasllog, headers, output)
         else:
             log.error("Could not parse ASL logs.")
 
 if __name__ == "__main__":
-    print "This is an AutoMacTC module, and is not meant to be run stand-alone."
-    print "Exiting."
+    print("This is an AutoMacTC module, and is not meant to be run stand-alone.")
+    print("Exiting.")
     sys.exit(0)
 else:
     module()

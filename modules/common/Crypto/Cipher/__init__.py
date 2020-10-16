@@ -24,7 +24,7 @@
 
 import os
 
-from _mode_cbc import _create_cbc_cipher
+from ._mode_cbc import _create_cbc_cipher
 
 _modes = { 2:_create_cbc_cipher,
            }

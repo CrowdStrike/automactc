@@ -1,8 +1,6 @@
 #!/usr/bin/env python
 
 '''
-@ author: Jai Musunuri
-@ email: jai.musunuri@crowdstrike.com
 
 @ purpose:
 
@@ -11,7 +9,7 @@ A module intended to read and parse system.log files on disk.
 '''
 
 # IMPORT FUNCTIONS FROM COMMON.FUNCTIONS
-from common.functions import stats2
+from .common.functions import stats2
 
 # IMPORT STATIC VARIABLES FROM MAIN
 from __main__ import inputdir
@@ -35,7 +33,11 @@ from itertools import groupby
 from operator import itemgetter
 from collections import OrderedDict
 from datetime import datetime, timedelta
-import dateutil.parser as parser
+try:
+    from builtins import range as xrange
+except:
+    pass
+from .common.dateutil import parser
 
 _modName = __name__.split('_')[-2]
 _modVers = '.'.join(list(__name__.split('_')[-1][1:]))
@@ -48,18 +50,28 @@ def syslog_parse(logfile, logdata, headers, output):
     multilines = {}
     for i in logdata:
         x+=1
-        if re.search('^[A-Za-z]{3}',i):
-            singlelines[x] = i.rstrip()
+        if (not isinstance(i, str)):
+            if re.search('^[A-Za-z]{3}'.encode('utf-8'),i):
+                singlelines[x] = i.rstrip()
+            else:
+                data.append(x)
+                data.append(x-1)
+                data.append(x+1)
+                multilines[x] = i.rstrip()
         else:
-            data.append(x)
-            data.append(x-1)
-            data.append(x+1)
-            multilines[x] = i.rstrip()
+            if re.search('^[A-Za-z]{3}',i):
+                singlelines[x] = i.rstrip()
+            else:
+                data.append(x)
+                data.append(x-1)
+                data.append(x+1)
+                multilines[x] = i.rstrip()
 
     data = list(OrderedDict.fromkeys(sorted(data)))
     ranges = []
-    for key, group in groupby(enumerate(data), lambda (index, item): index - item):
-        group = map(itemgetter(1), group)
+    #for key, group in groupby(enumerate(data), lambda (index, item): index - item):
+    for group in enumerate(data):
+        #group = map(itemgetter(1), group)
         if len(group) > 1:
             ranges.append(xrange(group[0], group[-1]))
         else:
@@ -72,13 +84,20 @@ def syslog_parse(logfile, logdata, headers, output):
                 lno = z
                 anchor = singlelines.get(z)
             else:
-                val = multilines.get(z).replace('\t','').replace('  ','')
+                if (not isinstance(multilines.get(z), str)):
+                    val = multilines.get(z).decode('utf-8').replace('\t','').replace('  ','')
+                else:
+                    val = multilines.get(z).replace('\t','').replace('  ','')
                 chain.append(val)
-
-        singlelines[lno] = anchor+' '+''.join(chain)
+        if (isinstance(anchor, str)):
+            singlelines[lno] = anchor+' '+''.join(chain)
+        else:
+            singlelines[lno] = anchor.decode('utf-8')+' '+''.join(chain)
 
     for k,v in singlelines.items():
         line = v
+        if (not isinstance(line, str)):
+            line = line.decode('utf-8')
         if not 'last message repeated' in line:
             record = OrderedDict((h, '') for h in headers)
             m = re.match(r"(?P<month>\w\w\w)\s{1,2}(?P<day>\d{1,2}) (?P<time>\w\w:\w\w:\w\w) (?P<systemname>.*?) (?P<processName>.*?)\[(?P<PID>[0-9]+)\].*?:\s{0,1}(?P<message>.*)", line)
@@ -112,10 +131,8 @@ def module():
                 syslog_parse(c_syslog, go_syslog, headers, output)
 
 if __name__ == "__main__":
-    print "This is an AutoMacTC module, and is not meant to be run stand-alone."
-    print "Exiting."
+    print("This is an AutoMacTC module, and is not meant to be run stand-alone.")
+    print("Exiting.")
     sys.exit(0)
 else:
     module()
-
-

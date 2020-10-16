@@ -1,0 +1,3 @@
+[console_scripts]
+xattr = xattr.tool:main
+
