@@ -484,7 +484,7 @@ if __name__ == "__main__":
 
     # Confirm that mount point in forensic mode has required directories - to see if the volume is actually mounted.
     mount_test = glob.glob(os.path.join(inputdir,'*'))
-    required_dirs = ['Library', 'System', 'Users', 'Applications', 'Network']
+    required_dirs = ['Library', 'System', 'Users', 'Applications']
     litmus = [i for i in mount_test if any(i.endswith(d) for d in required_dirs)]
     if len(litmus) < len(required_dirs) and forensic_mode and override_mount is False:
         print( "Mount point doesn't have any of the expected directories underneath. Check if the mount was completed successfully.")
