@@ -10,6 +10,7 @@ import os
 import os.path
 import stat
 import sys
+from unicodedata import normalize
 
 if sys.platform == 'darwin':
     from . import osx
@@ -20,11 +21,20 @@ except NameError:
     long = int
 
 from .utils import *
-    
+
 ALIAS_KIND_FILE = 0
 ALIAS_KIND_FOLDER = 1
 
 ALIAS_HFS_VOLUME_SIGNATURE = b'H+'
+
+ALIAS_FILESYSTEM_UDF     = 'UDF (CD/DVD)'
+ALIAS_FILESYSTEM_FAT32   = 'FAT32'
+ALIAS_FILESYSTEM_EXFAT   = 'exFAT'
+ALIAS_FILESYSTEM_HFSX    = 'HFSX'
+ALIAS_FILESYSTEM_HFSPLUS = 'HFS+'
+ALIAS_FILESYSTEM_FTP     = 'FTP'
+ALIAS_FILESYSTEM_NTFS    = 'NTFS'
+ALIAS_FILESYSTEM_UNKNOWN = 'unknown'
 
 ALIAS_FIXED_DISK = 0
 ALIAS_NETWORK_DISK = 1
@@ -34,6 +44,21 @@ ALIAS_1_44MB_FLOPPY_DISK = 4
 ALIAS_EJECTABLE_DISK = 5
 
 ALIAS_NO_CNID = 0xffffffff
+
+ALIAS_FSTYPE_MAP = {
+    # Version 2 aliases
+    b'HX': ALIAS_FILESYSTEM_HFSX,
+    b'H+': ALIAS_FILESYSTEM_HFSPLUS,
+
+    # Version 3 aliases
+    b'BDcu':   ALIAS_FILESYSTEM_UDF,
+    b'BDIS':   ALIAS_FILESYSTEM_FAT32,
+    b'BDxF':   ALIAS_FILESYSTEM_EXFAT,
+    b'HX\0\0': ALIAS_FILESYSTEM_HFSX,
+    b'H+\0\0': ALIAS_FILESYSTEM_HFSPLUS,
+    b'KG\0\0': ALIAS_FILESYSTEM_FTP,
+    b'NTcu':   ALIAS_FILESYSTEM_NTFS,
+}
 
 def encode_utf8(s):
     if isinstance(s, bytes):
@@ -56,7 +81,7 @@ class AppleShareInfo (object):
 
     def __repr__(self):
         return 'AppleShareInfo(%r,%r,%r)' % (self.zone, self.server, self.user)
-    
+
 class VolumeInfo (object):
     def __init__(self, name, creation_date, fs_type, disk_type,
                  attribute_flags, fs_id, appleshare_info=None,
@@ -64,13 +89,15 @@ class VolumeInfo (object):
                  dialup_info=None, network_mount_info=None):
         #: The name of the volume on which the target resides
         self.name = name
-        
+
         #: The creation date of the target's volume
         self.creation_date = creation_date
-        
-        #: The filesystem type (a two character code, e.g. ``b'H+'`` for HFS+)
+
+        #: The filesystem type
+        #: (for v2 aliases, this is a 2-character code; for v3 aliases, a
+        #: 4-character code).
         self.fs_type = fs_type
-        
+
         #: The type of disk; should be one of
         #:
         #:   * ALIAS_FIXED_DISK
@@ -109,6 +136,10 @@ class VolumeInfo (object):
         #: Network mount information (for automatic remounting)
         self.network_mount_info = network_mount_info
 
+    @property
+    def filesystem_type(self):
+        return ALIAS_FSTYPE_MAP.get(self.fs_type, ALIAS_FILESYSTEM_UNKNOWN)
+
     def __repr__(self):
         args = ['name', 'creation_date', 'fs_type', 'disk_type',
                 'attribute_flags', 'fs_id']
@@ -116,7 +147,7 @@ class VolumeInfo (object):
         for a in args:
             v = getattr(self, a)
             values.append(repr(v))
-            
+
         kwargs = ['appleshare_info', 'driver_name', 'posix_path',
                   'disk_image_alias', 'dialup_info', 'network_mount_info']
         for a in kwargs:
@@ -124,7 +155,7 @@ class VolumeInfo (object):
             if v is not None:
                 values.append('%s=%r' % (a, v))
         return 'VolumeInfo(%s)' % ','.join(values)
-    
+
 class TargetInfo (object):
     def __init__(self, kind, filename, folder_cnid, cnid, creation_date,
                  creator_code, type_code, levels_from=-1, levels_to=-1,
@@ -132,7 +163,7 @@ class TargetInfo (object):
                  posix_path=None, user_home_prefix_len=None):
         #: Either ALIAS_KIND_FILE or ALIAS_KIND_FOLDER
         self.kind = kind
-        
+
         #: The filename of the target
         self.filename = filename
 
@@ -197,7 +228,7 @@ class TargetInfo (object):
             values.append('%s=%r' % (a, v))
 
         return 'TargetInfo(%s)' % ','.join(values)
-    
+
 TAG_CARBON_FOLDER_NAME = 0
 TAG_CNID_PATH = 1
 TAG_CARBON_PATH = 2
@@ -225,12 +256,12 @@ class Alias (object):
         #: Application specific information (four byte byte-string)
         self.appinfo = appinfo
 
-        #: Version (we support only version 2)
+        #: Version (we support versions 2 and 3)
         self.version = version
 
         #: A :class:`VolumeInfo` object describing the target's volume
         self.volume = volume
-        
+
         #: A :class:`TargetInfo` object describing the target
         self.target = target
 
@@ -243,21 +274,33 @@ class Alias (object):
 
         if recsize < 150:
             raise ValueError('Incorrect alias length')
-                        
-        if version != 2:
+
+        if version not in (2, 3):
             raise ValueError('Unsupported alias version %u' % version)
 
-        kind, volname, voldate, fstype, disktype, \
-        folder_cnid, filename, cnid, crdate, creator_code, type_code, \
-        levels_from, levels_to, volattrs, volfsid, reserved = \
-              struct.unpack(b'>h28pI2shI64pII4s4shhI2s10s', b.read(142))
+        if version == 2:
+            kind, volname, voldate, fstype, disktype, \
+            folder_cnid, filename, cnid, crdate, creator_code, type_code, \
+            levels_from, levels_to, volattrs, volfsid, reserved = \
+                struct.unpack(b'>h28pI2shI64pII4s4shhI2s10s', b.read(142))
+        else:
+            kind, voldate_hr, fstype, disktype, folder_cnid, cnid, crdate_hr, \
+            volattrs, reserved = \
+                struct.unpack(b'>hQ4shIIQI14s', b.read(46))
+
+            volname = b''
+            filename = b''
+            creator_code = None
+            type_code = None
+            voldate = voldate_hr / 65536.0
+            crdate = crdate_hr / 65536.0
 
         voldate = mac_epoch + datetime.timedelta(seconds=voldate)
         crdate = mac_epoch + datetime.timedelta(seconds=crdate)
 
         alias = Alias()
         alias.appinfo = appinfo
-            
+
         alias.volume = VolumeInfo (volname.decode().replace('/',':'),
                                    voldate, fstype, disktype,
                                    volattrs, volfsid)
@@ -266,7 +309,7 @@ class Alias (object):
                                    crdate, creator_code, type_code)
         alias.target.levels_from = levels_from
         alias.target.levels_to = levels_to
-        
+
         tag = struct.unpack(b'>h', b.read(2))[0]
 
         while tag != -1:
@@ -324,9 +367,9 @@ class Alias (object):
                 alias.extra.append((tag, value))
 
             tag = struct.unpack(b'>h', b.read(2))[0]
-            
+
         return alias
-         
+
     @classmethod
     def from_bytes(cls, bytes):
         """Construct an :class:`Alias` object given binary Alias data."""
@@ -340,13 +383,17 @@ class Alias (object):
             raise Exception('Not implemented (requires special support)')
 
         path = encode_utf8(path)
-        
+
         a = Alias()
 
         # Find the filesystem
         st = osx.statfs(path)
         vol_path = st.f_mntonname
-        
+
+        # File and folder names in HFS+ are normalized to a form similar to NFD.
+        # Must be normalized (NFD->NFC) before use to avoid unicode string comparison issues.
+        vol_path = normalize("NFC", vol_path.decode('utf-8')).encode('utf-8')
+
         # Grab its attributes
         attrs = [osx.ATTR_CMN_CRTIME,
                  osx.ATTR_VOL_NAME,
@@ -355,7 +402,7 @@ class Alias (object):
 
         vol_crtime = volinfo[0]
         vol_name = encode_utf8(volinfo[1])
-        
+
         # Also grab various attributes of the file
         attrs = [(osx.ATTR_CMN_OBJTYPE
                   | osx.ATTR_CMN_CRTIME
@@ -371,14 +418,14 @@ class Alias (object):
 
         cnid = info[3]
         folder_cnid = info[4]
-        
+
         dirname, filename = os.path.split(path)
 
         if dirname == b'' or dirname == b'.':
             dirname = os.getcwd()
 
         foldername = os.path.basename(dirname)
-        
+
         creation_date = info[1]
 
         if kind == ALIAS_KIND_FILE:
@@ -425,7 +472,7 @@ class Alias (object):
         a.target.cnid_path = cnid_path
 
         return a
-    
+
     def _to_fd(self, b):
         # We'll come back and fix the length when we're done
         pos = b.tell()
@@ -436,24 +483,37 @@ class Alias (object):
         voldate = (self.volume.creation_date - mac_epoch).total_seconds()
         crdate = (self.target.creation_date - mac_epoch).total_seconds()
 
-        # NOTE: crdate should be in local time, but that's system dependent
-        #       (so doing so is ridiculous, and nothing could rely on it).
-        b.write(struct.pack(b'>h28pI2shI64pII4s4shhI2s10s',
-                            self.target.kind,
-                            carbon_volname, int(voldate),
-                            self.volume.fs_type,
-                            self.volume.disk_type,
-                            self.target.folder_cnid,
-                            carbon_filename,
-                            self.target.cnid,
-                            int(crdate),
-                            self.target.creator_code,
-                            self.target.type_code,
-                            self.target.levels_from,
-                            self.target.levels_to,
-                            self.volume.attribute_flags,
-                            self.volume.fs_id,
-                            b'\0'*10))
+        if self.version == 2:
+            # NOTE: crdate should be in local time, but that's system dependent
+            #       (so doing so is ridiculous, and nothing could rely on it).
+            b.write(struct.pack(b'>h28pI2shI64pII4s4shhI2s10s',
+                                self.target.kind,
+                                carbon_volname, int(voldate),
+                                self.volume.fs_type,
+                                self.volume.disk_type,
+                                self.target.folder_cnid,
+                                carbon_filename,
+                                self.target.cnid,
+                                int(crdate),
+                                self.target.creator_code,
+                                self.target.type_code,
+                                self.target.levels_from,
+                                self.target.levels_to,
+                                self.volume.attribute_flags,
+                                self.volume.fs_id,
+                                b'\0'*10))
+        else:
+            b.write(struct.pack(b'>hQ4shIIQI14s',
+                                self.target.kind,
+                                int(voldate * 65536),
+                                self.volume.fs_type,
+                                self.volume.disk_type,
+                                self.target.folder_cnid,
+                                self.target.cnid,
+                                int(crdate * 65536),
+                                self.volume.attribute_flags,
+                                self.volume.fs_id,
+                                b'\0'*14))
 
         # Excuse the odd order; we're copying Finder
         if self.target.folder_name:
@@ -578,7 +638,7 @@ class Alias (object):
                 b.write(b'\0')
 
         b.write(struct.pack(b'>hh', -1, 0))
-        
+
         blen = b.tell() - pos
         b.seek(pos + 4, os.SEEK_SET)
         b.write(struct.pack(b'>h', blen))

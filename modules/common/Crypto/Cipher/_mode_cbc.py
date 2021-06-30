@@ -43,7 +43,25 @@ from ._raw_api import (load_pycryptodome_raw_lib, VoidPointer,
 from os import urandom
 get_random_bytes = urandom
 
-raw_cbc_lib = load_pycryptodome_raw_lib("Crypto.Cipher._raw_cbc", """
+try:
+    raw_cbc_lib = load_pycryptodome_raw_lib("Crypto.Cipher._raw_cbc", """
+                int CBC_start_operation(void *cipher,
+                                        const uint8_t iv[],
+                                        size_t iv_len,
+                                        void **pResult);
+                int CBC_encrypt(void *cbcState,
+                                const uint8_t *in,
+                                uint8_t *out,
+                                size_t data_len);
+                int CBC_decrypt(void *cbcState,
+                                const uint8_t *in,
+                                uint8_t *out,
+                                size_t data_len);
+                int CBC_stop_operation(void *state);
+                """
+                )
+except Exception:
+    raw_cbc_lib = load_pycryptodome_raw_lib("Crypto.Cipher._raw_cbc_arm", """
                 int CBC_start_operation(void *cipher,
                                         const uint8_t iv[],
                                         size_t iv_len,

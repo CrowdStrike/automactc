@@ -1,6 +1,14 @@
 import sys
 import os
-from ..cffi import FFI
+
+if sys.version_info[0] == 3:
+    if sys.version_info[1] == 7:
+        from ..cffi37 import FFI
+    elif sys.version_info[1] == 8:
+        from ..cffi38 import FFI
+    elif sys.version_info[1] == 9:
+        from ..cffi39 import FFI 
+
 
 PATH = os.path.dirname(__file__)
 

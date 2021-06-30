@@ -64,7 +64,11 @@ _cproto = """
 
 
 # Load portable AES
-_raw_aes_lib = load_pycryptodome_raw_lib("Crypto.Cipher._raw_aes",
+try:
+    _raw_aes_lib = load_pycryptodome_raw_lib("Crypto.Cipher._raw_aes",
+                                         _cproto)
+except Exception:
+    _raw_aes_lib = load_pycryptodome_raw_lib("Crypto.Cipher._raw_aes_arm",
                                          _cproto)
 
 # Try to load AES with AES NI instructions

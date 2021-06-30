@@ -12,36 +12,43 @@ By specifying the python path as above, the necessary libraries
 
 '''
 
-import sys
-import os
-from importlib import import_module
 import argparse
-import glob
-import time
-import subprocess
-import tarfile
-import sqlite3
-import plistlib
-import gzip
-import shutil
-import json
 import csv
-import traceback
-import string
-import logging
-import shutil
+import glob
+import gzip
+import io
 import itertools
-from random import choice
-from datetime import datetime
+import json
+import logging
+import os
+import plistlib
+import shutil
+import sqlite3
+import string
+import subprocess
+import sys
+import tarfile
+import traceback
 from collections import OrderedDict
-from modules.common.functions import finditem
+from datetime import datetime
+from importlib import import_module
 from multiprocessing import Pool
-from modules.common.dep import six
+from random import choice
+from threading import Lock
 
-__version__ = '1.0.0.6'
+from modules.common.functions import finditem
 
-# Establish argparser.
+if sys.version_info[0] < 3:
+    import codecs
+    import cStringIO
+
+__version__ = '1.2.0.13-alpha'
+
+
 def parseArguments():
+    """Initialize argparser
+    Returns argparse object of captured arguments.
+    """
     parser = argparse.ArgumentParser(description="AutoMacTC: an Automated macOS forensic triage collection framework.", add_help=False)
 
     module_filter = parser.add_argument_group('module filter')
@@ -52,7 +59,9 @@ def parseArguments():
 
     general = parser.add_argument_group('general arguments')
     general.add_argument("-h", "--help", action="help", help="show this help message and exit")
-    general.add_argument('-i', '--inputdir', default='/', help='input directory (mount dmg with mountdmg.sh script and use -f to analyze mounted HFS or APFS Volume)', required=False)
+    general.add_argument("-v", "--verbose", default=False, action='store_true', help="enable verbose logging")
+    general.add_argument('-i', '--inputdir', default='/', help='input directory; mount dmg with mountdmg.sh script and use -f to analyze mounted HFS or APFS Volume, use volume appended with "Data" (e.g. "Macintosh HD - Data") for 10.15+ systems', required=False)
+    general.add_argument('-is', '--inputsysdir', default='', help='input system drive if using mounted drive from 10.15+ system (e.g. "Macintosh HD")', required=False)
     general.add_argument('-o', '--outputdir', default='./', help='output directory', required=False)
     general.add_argument('-p', '--prefix', help='prefix to append to tarball and/or output files', default='automactc-output', required=False)
     general.add_argument('-f', '--forensic_mode', help='if flag is provided, will analyze mounted volume provided as inputdir', default=False, action='store_true', required=False)
@@ -66,6 +75,7 @@ def parseArguments():
     console_log_args = parser.add_argument_group('console logging verbosity')
     console_logging_args = console_log_args.add_mutually_exclusive_group(required=False)
     console_logging_args.add_argument('-q', '--quiet', help='if flag is provided, will NOT output to console at all', default=False, action='store_true', required=False)
+    console_logging_args.add_argument('-r', '--rtr', help='reduce verbosity to display nicely on RTR console', default=False, action='store_true', required=False)
     console_logging_args.add_argument('-d', '--debug', help='enable debug logging to console', default=False, action='store_true', required=False)
 
     dirlist_args = parser.add_argument_group('specific module arguments')
@@ -83,23 +93,24 @@ def parseArguments():
 
 
 def gen_availablemods(dir_path):
-    # Generate list of mods available to be run.
+    """Generate list of mods available to be run.
+    """
     mod_dir = os.listdir(os.path.join(dir_path, 'modules'))
     mods = [i.replace('.py', '') for i in mod_dir if i.startswith('mod_') and i.endswith('.py')]
 
     live_or_dead_mods = [i for i in mods if not i.startswith('mod_live_') and not i.startswith('mod_dead_')]
     only_live_mods = sorted([i for i in mods if i.startswith('mod_live_')])
-    only_dead_mods = [i for i in mods if i.startswith('mod_dead_')]
 
     available_mods = only_live_mods + live_or_dead_mods
 
     return available_mods
 
 
-# Generate the list of modules to run.
 def gen_runlist(selected, available_mods):
-    # selected is the user input via -m or -x.
-
+    """Generate list of modules to run.
+    selected is the user input via -m (specify module list) or -x (specify
+    exclude list).
+    """
     selected = list(OrderedDict.fromkeys(selected))
     # Handle what to do if the user inputs 'all'
     if 'all' in selected and len(selected) == 1:
@@ -139,6 +150,9 @@ def gen_runlist(selected, available_mods):
 
 
 def gen_fullprefix(startTime):
+    """Build AutoMacTC prefix based on prefix, hostname, ip, runtime.
+    Returns the generated prefix and the serial number if found.
+    """
     log.debug("Building output file prefix.")
 
     # Get system serial number.
@@ -160,7 +174,7 @@ def gen_fullprefix(startTime):
             error = [x for x in traceback.format_exc().split('\n') if "OperationalError" in x]
             log.debug("Could not connect [{0}].".format(error[0]))
             if "database is locked" or "unable to open" in error[0]:
-                tmpdb = os.path.basename(db)+'-tmp'
+                tmpdb = os.path.basename(db) + '-tmp'
                 log.debug("Trying to connect to db copied to temp location...")
 
                 shutil.copyfile(db, os.path.join(outputdir, tmpdb))
@@ -171,7 +185,7 @@ def gen_fullprefix(startTime):
                     log.debug("Successfully connected.")
                     os.remove(db)
                     break
-                except:
+                except Exception:
                     log.debug("Could not get serial number from {0}. Trying another directory.".format(db))
                 os.remove(db)
 
@@ -188,11 +202,10 @@ def gen_fullprefix(startTime):
     else:
         try:
             pref_plist = open(os.path.join(inputdir, 'Library/Preferences/SystemConfiguration/preferences.plist'), 'rb')
-            try:
-                preferences = plistlib.load(pref_plist)
-            except Exception as e:
-                log.debug("Using python2 code to read preferences.plist.")
+            if sys.version_info[0] < 3:
                 preferences = plistlib.readPlist(pref_plist)
+            else:
+                preferences = plistlib.load(pref_plist)
             _hostname = finditem(preferences, 'HostName')
             if not _hostname:
                 _hostname = finditem(preferences, 'LocalHostName')
@@ -220,7 +233,7 @@ def gen_fullprefix(startTime):
                 last_ip = [i for i in wifi_data if "Local IP" in i][-1].rstrip()
                 _ip = last_ip.split(' ')[-1]
                 iptime = ' '.join(last_ip.split(' ')[0:4])
-                log.debug("Last IP address {0} was assigned around {1} (local time).".format(_ip,iptime))
+                log.debug("Last IP address {0} was assigned around {1} (local time).".format(_ip, iptime))
             except IndexError:
                 log.debug("Could not find last IP in wifi.log, will check historical wifi.log.*.bz2 files.")
         except IOError:
@@ -232,7 +245,7 @@ def gen_fullprefix(startTime):
                 try:
                     wifi_bzdata, e = subprocess.Popen(["bzcat", i], stdout=subprocess.PIPE, stderr=subprocess.STDOUT).communicate()
                     wdata.append(wifi_bzdata.split('\n'))
-                except Exception as e:
+                except Exception:
                     log.debug("Could not parse {0}.".format(i))
         w = list(itertools.chain.from_iterable(wdata))
 
@@ -240,83 +253,275 @@ def gen_fullprefix(startTime):
             last_ip = [i for i in w if "Local IP" in i][0].rstrip()
             _ip = last_ip.split(' ')[-1]
             iptime = ' '.join(last_ip.split(' ')[0:4])
-            log.debug("Last IP address {0} was assigned around {1} (local time).".format(_ip,iptime))
-        except Exception as e:
+            log.debug("Last IP address {0} was assigned around {1} (local time).".format(_ip, iptime))
+        except Exception:
             log.debug("Could not get last IP from current or historical wifi.log files. Recorded at 255.255.255.255.")
             _ip = "255.255.255.255"
 
     # Get automactc runtime.
     _runtime = str(startTime.replace(microsecond=0)).replace('+00:00', 'Z').replace(' ', 'T')
+    if _runtime[-1] != 'Z':
+        _runtime = _runtime + 'Z'
 
     # Assemble prefix.
     full_prefix = '{0},{1},{2},{3}'.format(_prefix, _hostname, _ip, _runtime).replace(':', '_')
 
     return full_prefix, _serial
 
+
 def del_none(d):
+    """Utility to recursively delete keys with no value.
+    """
     for key, value in list(d.items()):
-        if value is None or value is "":
+        if value is None or value == "":
             del d[key]
         elif isinstance(value, dict):
             del_none(value)
     return d
 
-# Establish data_writer class to handle output file format and naming scheme.
+
+class UnicodeWriter:
+    """
+    A CSV writer which will write rows to CSV file "f",
+    which is encoded in the given encoding.
+
+    Adopted from the Python documentation
+    Source: https://docs.python.org/2.7/library/csv.html
+    """
+
+    def __init__(self, f, dialect=csv.excel, encoding="utf-8", **kwds):
+        self.queue = cStringIO.StringIO()
+        self.writer = csv.writer(self.queue, dialect=dialect, **kwds)
+        self.stream = f
+        self.encoder = codecs.getincrementalencoder(encoding)()
+
+    def writerow(self, row):
+        self.writer.writerow([s.encode("utf-8") for s in row])
+        data = self.queue.getvalue()  # Fetch UTF-8 output from the queue ...
+        data = data.decode("utf-8")
+
+        self.stream.write(data)  # write to the target stream
+        self.queue.truncate(0)
+
+    def writerows(self, rows):
+        for row in rows:
+            self.writerow(row)
+
+
 class data_writer:
+    """
+    Establish data_writer class to handle output file format and naming scheme.
+    """
 
     output_format = parseArguments().output_format
 
     def __init__(self, name, headers, datatype=output_format):
-        # TODO: Remove the 'replace' of output once all that stuff is removed from the modules.
+        """
+        Initialize the data_writer.
+        If headers is None, treats as just a wrapper.
+        If datatype is 'all', writes in all available formats (csv, json).
+
+        Caller must call the flush method at the close of the module to ensure
+        all contents of queue that were < buffer_size at the end are written
+        to the file.
+        """
+        possible_formats = ["json", "csv", "file"]
+        if datatype not in possible_formats and datatype != 'all':
+            raise ValueError('Unable to instantiate data_writer for datatype {0}'.format(datatype))
+
+        if sys.version_info[0] < 3 and headers is not None:
+            self.headers = [str(h).decode('utf-8') for h in headers]
+        else:
+            self.headers = headers
         self.name = filename_prefix + ',' + name + runID
         self.mod = name
         self.datatype = datatype
-        self.headers = headers
+        self._log = logging.getLogger(self.mod)
+        self.__queue = list()
+        self.__queue_data_writer = None
+        self.__mux = Lock()  # make thread-safe for concurrent modules
+
+        formats = []
+        if datatype == 'all':
+            formats = possible_formats
+        else:
+            formats.append(datatype)
+
         self.output_filename = self.name + '.' + self.datatype
         self.data_file_name = os.path.join(outputdir, self.output_filename)
 
-        self._log = logging.getLogger(self.mod)
-
+        if headers is None:  # no file generated here. simply to manage file name for output to be captured.
+            return
         if self.datatype == 'csv':
-            with open(self.data_file_name, 'w') as data_file:
-                writer = csv.writer(data_file)
+            with io.open(self.data_file_name, 'w', encoding='utf-8') as data_file:
+                if sys.version_info[0] < 3:
+                    writer = UnicodeWriter(data_file)
+                else:
+                    writer = csv.writer(data_file)
                 writer.writerow(self.headers)
         elif self.datatype == 'json':
-            with open(self.data_file_name, 'w') as data_file:
+            with io.open(self.data_file_name, 'w', encoding='utf-8') as data_file:
                 pass
+        elif self.datatype == 'file':  # no file generated here. simply to manage file name for output to be captured.
+            return
 
     def write_entry(self, data):
+        """
+        Writes output entry to output file.
+        data is a list of strings.
+        """
+        log.warn("write_entry will be deprecated in future versions, use write_record instead :) ")
         if self.datatype == 'csv':
-            with open(self.data_file_name, 'a') as data_file:
-                writer = csv.writer(data_file)
-                try:
-                    # if six.PY3:
-                    #     writer.writerow(data)
-                    # else:
-                    #     if isinstance(data[0], str):
-                    #         writer.writerow([unicode(s).encode('utf-8') for s in data])
-                    #     else:
-                    #         writer.writerow([s for s in data if s is not None])
-                    writer.writerow(data)
-                except Exception as e:
-                    self._log.debug("Could not write line {0} | {1}".format(data, [traceback.format_exc()]))
+            self.__csv_write_entry(data)
         elif self.datatype == 'json':
-            zipped_data = del_none(dict(zip(self.headers, data)))
-            with open(self.data_file_name, 'a') as data_file:
-                try:
-                    json.dump(zipped_data, data_file)
+            self.__json_write_entry(data)
+        elif self.datatype == 'all':
+            self.__json_write_entry(data, all=True)
+            self.__csv_write_entry(data, All=True)
+        return ""
+
+    def write_record(self, record, buffer_cap=10000):
+        """
+        Writes output entry to buffer.
+        Record is a list object or dict like object.
+        Once buffer_cap entries are stored in the queue, it is flushed to file.
+
+        Caller must call the flush method at the close of the module to ensure
+        all contents of queue that were < buffer_size at the end are written
+        to the file.
+        """
+        if record is not None:
+            # We need to enforce the correct encoding for both versions of python
+            if sys.version_info[0] < 3:
+                if isinstance(record, list):
+                    self.__queue.append([str(s).decode('utf-8') if isinstance(s, unicode) is False else s for s in record])
+                else:
+                    self.__queue.append([str(s).decode('utf-8') if isinstance(s, unicode) is False else s for s in record.values()])
+            else:
+                if isinstance(record, list):
+                    self.__queue.append([s.decode('utf-8') if isinstance(s, bytes) else str(s) for s in record])
+                else:
+                    self.__queue.append(s.decode('utf-8') if isinstance(s, bytes) else str(s) for s in record.values())
+        if len(self.__queue) > buffer_cap:
+            self.flush_record()
+        return ""
+
+    def flush_record(self):
+        """
+        Flush the queue to the output file.
+        Blocking method.
+        This method should be called at the close of the module to handle
+        straggling entries in the buffer.
+        """
+        self.__mux.acquire()
+        try:
+            if self.datatype == 'csv':
+                self.__csv_flush_record()
+            elif self.datatype == 'json':
+                self.__json_flush_record()
+            elif self.datatype == 'all':
+                self.__csv_flush_record(all=True)
+                self.__json_flush_record(all=True)
+        except Exception as e:
+            log.debug("data_writer: Failed to flush queue: {0}: {1}".format(str(e), [traceback.format_exc()]))
+        finally:
+            try:
+                if sys.version_info[0] < 3:
+                    del self.__queue[:]
+                else:
+                    self.__queue.clear()
+            except Exception as e:
+                log.error("data_writer: Failed to clear datawriter queue: {0}".format(str(e)))
+            self.__mux.release()
+
+    def __csv_flush_record(self, all=False):
+        """
+        Lower method for flushing contents of data_writer queue to CSV file.
+        all is a bool determining if we are writing all output types as well.
+        After this method exits, the contents of the queue will be stored
+        in the CSV file.
+        """
+        data_file_name = self.data_file_name
+        if all is True:
+            data_file_name = data_file_name.split('all')[0] + 'csv'
+
+        with io.open(data_file_name, 'a', encoding='utf-8') as data_file:
+            if sys.version_info[0] < 3:
+                self.__queue_data_writer = UnicodeWriter(data_file)
+            else:
+                self.__queue_data_writer = csv.writer(data_file)
+            self.__queue_data_writer.writerows([row for row in self.__queue])
+            data_file.flush()
+
+    def __json_flush_record(self, all=False):
+        """
+        Lower method for flushing contents of data_writer queue to JSON file.
+        all is a bool determining if we are writing all output types as well.
+        After this method exits, the contents of the queue will be stored in
+        the JSON file.
+        """
+        data_file_name = self.data_file_name
+        if all is True:
+            data_file_name = data_file_name.split('all')[0] + 'json'
+        zipped_data_list = [del_none(dict(zip(self.headers, entry))) for entry in self.__queue]
+        with io.open(data_file_name, 'a', encoding='utf-8') as data_file:
+            for zipped_data in zipped_data_list:
+                if sys.version_info[0] < 3:
+                    data_file.write(unicode(json.dumps(zipped_data, indent=None)))
+                    data_file.write('\n'.decode('utf-8'))
+                else:
+                    # json.dump(zipped_data, data_file, indent=None)
+                    data_file.write(json.dumps(zipped_data, indent=None))
                     data_file.write('\n')
-                except Exception as e:
-                    self._log.debug("Could not write line {0} | {1}".format(data, [traceback.format_exc()]))
+            data_file.flush()
+
+    def __json_write_entry(self, data, all=False):
+        log.warn("__json_write_entry will be deprecated in future versions, use __json_write_record instead :) ")
+        data_file_name = self.data_file_name
+        if all is True:
+            data_file_name = data_file_name.split('all')[0] + 'json'
+        zipped_data = del_none(dict(zip(self.headers, data)))
+        with io.open(data_file_name, 'a', encoding='utf-8') as data_file:
+
+            if sys.version_info[0] < 3:
+                data_file.write(unicode(json.dumps(zipped_data, indent=None)))
+                data_file.write('\n'.decode('utf-8'))
+            else:
+                json.dump(zipped_data, data_file, indent=None)
+                data_file.write('\n')
+
+            data_file.flush()
+
+    def __csv_write_entry(self, data, all=False):
+        log.warn("__csv_write_entry will be deprecated in future versions, use __csv_write_record instead :) ")
+        data_file_name = self.data_file_name
+        if all is True:
+            data_file_name = data_file_name.split('all')[0] + 'csv'
+        with io.open(data_file_name, 'a', encoding='utf-8') as data_file:
+            if sys.version_info[0] < 3:
+                writer = UnicodeWriter(data_file)
+            else:
+                writer = csv.writer(data_file)
+            writer.writerow(data)
 
 
-# Establish class to build tarball of output files on the fly.
 class build_tar:
+    """
+    Establish class to build tarball of AutoMacTC output files on the fly.
+    """
 
     def __init__(self, name):
+        """
+        Initialize the build_rar wrapper.
+        name is a string denoting filename of the tarball.
+        """
         self.name = name
 
     def add_file(self, fname):
+        """
+        Add the filepath specified by fname to the tarball.
+        fname is a valid filepath to an AutoMacTC output file.
+        """
         if not no_tarball:
             out_tar = os.path.join(outputdir, self.name)
             t_fname = os.path.join(outputdir, fname)
@@ -333,9 +538,9 @@ class build_tar:
                 log.error("Added to archive, but could not delete {0}.".format(t_fname))
 
 
-
-# Run the modules that were selected via gen_runlist().
 def run_modules():
+    """Run the modules that were selected via gen_runlist().
+    """
     pool = Pool()
     if module_inc_opts != ['']:
         runmods = gen_runlist(module_inc_opts, available_mods)
@@ -358,11 +563,15 @@ def run_modules():
     pool.join()
 
 
-# Run the module specified.
 def modExec(module):
-    modName = module.split('_')[-2]
-    modVers = '.'.join(list(module.split('_')[-1][1:]))
-    dn = '{0} (v{1})'.format(modName.upper(), modVers)
+    """Run the module specified.
+    module is a string denoting the module file name
+    """
+    modName = module.split('_')[-1]
+    if "live" in module:
+        dn = '{0} (live)'.format(modName.upper())
+    else:
+        dn = '{0}'.format(modName.upper())
 
     try:
         modStart = datetime.utcnow()
@@ -390,46 +599,56 @@ def modExec(module):
         log.error("{0} failed: {1}".format(module, [traceback.format_exc()]))
 
 
-# GZIP the tar archive.
 def gz_tar(full_prefix):
+    """GZIP the tar archive.
+    full_prefix is a string denoting the filename prefix of the tar file.
+    """
     tarfile = os.path.join(outputdir, full_prefix + '.tar')
     try:
         with open(tarfile, 'rb') as f_in, gzip.open(tarfile + '.gz', 'wb') as f_out:
             shutil.copyfileobj(f_in, f_out)
         os.remove(tarfile)
-    except FileNotFoundError as e:
+    except Exception as e:
         log.error("Tarfile {0} was not generated. Module(s) run collected no info?".format(tarfile))
         log.error(e)
 
     return tarfile + '.gz'
 
-# Subprocess remove quarantine xattrs
+
 def subq_remove(subqpath):
+    """Subprocess remove quarantine xattrs.
+    """
     xattr_cmd = "xattr -d com.apple.quarantine " + subqpath
     try:
         subprocess.call(xattr_cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     except OSError:
         return ''
 
+
 if __name__ == "__main__":
 
     # Remove quarantine xattrs for 10.15+
     quarantine_remove = ['./modules/common/dep/_cffi_backend.cpython-37m-darwin.so',
-                        './modules/common/CryptoOld/Cipher/_AES.cpython-37m-darwin.so', 
-                        './modules/common/Crypto/Cipher/_raw_cbc.so', './modules/common/Crypto/Util/_cpuid_c.so',
-                        './modules/common/Crypto/Cipher/_raw_aes.so', './modules/common/Crypto/Cipher/_raw_aesni.so']
+                         './modules/common/dep/_cffi_backend.cpython-39-darwin.so',
+                         './modules/common/dep/_cffi_backend.cpython-38-darwin.so']
+    for p in glob.glob('./modules/common/dep/xattr/__pycache__/*'):
+        quarantine_remove.append(p)
+    for p in glob.glob('./modules/common/Crypto/*/*.so'):
+        quarantine_remove.append(p)
     for i in quarantine_remove:
         subq_remove(i)
 
     startTime = datetime.utcnow()
 
     # Set environmental variable TZ to UTC.
-    os.environ['TZ'] = 'UTC0'
+    os.environ['TZ'] = 'UTC'
+    os.environ['LC_ALL'] = 'en_US.UTF-8'
 
     # Establish static variables for program based on CLI invocation.
     args = parseArguments()
 
     inputdir = args.inputdir
+    inputsysdir = args.inputsysdir
     outputdir = args.outputdir
 
     module_inc_opts = args.include_modules
@@ -437,6 +656,8 @@ if __name__ == "__main__":
 
     no_tarball = args.no_tarball
     quiet = args.quiet
+    rtr = args.rtr
+    verbose = args.verbose
     debug = args.debug
     _prefix = args.prefix
     output_format = args.output_format
@@ -465,32 +686,36 @@ if __name__ == "__main__":
 
     # Add functionality for --list argument to enumerate available mods.
     if args.list_modules:
-        print( "Modules available for use:")
+        print("Modules available for use:")
+        available_mods.sort()
         for i in available_mods:
-            _modName = i.split('_')[-2]
-            _modVers = '.'.join(list(i.split('_')[-1][1:]))
-            print( '\t {0} (v{1})'.format(_modName, _modVers))
+            if "live" in i:
+                _modName = i.split('_')[-1]
+                print('\t {0} (live)'.format(_modName))
+            else:
+                _modName = i.split('_')[-1]
+                print('\t {0}'.format(_modName))
         sys.exit(0)
 
     # Check if at least -m all is invoked, else quit.
     if module_inc_opts == [''] and module_exc_opts == ['']:
-        print( "You must provide at least '-m all' to run with all default settings. Exiting.")
+        print("You must provide at least '-m all' to run with all default settings. Exiting.")
         sys.exit(0)
 
     # Confirm that user is running script with root privileges.
     if os.geteuid() != 0:
-        print( "You need to have root privileges to run this script.\nPlease try again, this time as 'sudo'. Exiting.")
+        print("You need to have root privileges to run this script.\nPlease try again, this time as 'sudo'. Exiting.")
         sys.exit(0)
 
     # Confirm that mount point in forensic mode has required directories - to see if the volume is actually mounted.
-    mount_test = glob.glob(os.path.join(inputdir,'*'))
-    required_dirs = ['Library', 'System', 'Users', 'Applications', 'Network']
+    mount_test = glob.glob(os.path.join(inputdir, '*'))
+    required_dirs = ['Library', 'System', 'Users', 'Applications']
     litmus = [i for i in mount_test if any(i.endswith(d) for d in required_dirs)]
     if len(litmus) < len(required_dirs) and forensic_mode and override_mount is False:
-        print( "Mount point doesn't have any of the expected directories underneath. Check if the mount was completed successfully.")
+        print("Mount point doesn't have any of the expected directories underneath. Check if the mount was completed successfully.")
         sys.exit(0)
     elif override_mount:
-        print( "Mount point doesn't have any of the expected directories underneath, but will proceeed despite this...")
+        print("Mount point doesn't have any of the expected directories underneath, but will proceeed despite this...")
 
     # Generate outputdir if it doesn't already exist.
     if os.path.isdir(outputdir) is False:
@@ -525,7 +750,7 @@ if __name__ == "__main__":
     log = logging.getLogger('automactc')
 
     # Create handler for CONSOLE printing.
-    ch = logging.StreamHandler(sys.stderr)
+    ch = logging.StreamHandler(sys.stdout)
 
     # Handle console logging verbosity.
     if args.quiet:
@@ -547,10 +772,10 @@ if __name__ == "__main__":
 
     # Check if user is trying to run AMTC against mounted volume.
     if inputdir.startswith('/Volumes') and not forensic_mode:
-        print( "Your input appears to begin with /Volumes.")
-        try:
+        print("Your input appears to begin with /Volumes.")
+        if sys.version_info[0] < 3:
             chk_4n6 = raw_input("Are you trying to run automactc against a mounted volume? (y/n/q)")
-        except NameError:
+        else:
             chk_4n6 = input("Are you trying to run automactc against a mounted volume? (y/n/q)")
         if chk_4n6.lower() in ['y', 'yes']:
             forensic_mode = True
@@ -564,30 +789,38 @@ if __name__ == "__main__":
     filename_prefix = ', '.join(full_prefix.split(', ')[:4])
     log.debug("Full prefix: {0}".format(full_prefix))
 
-
     # Capture the OS version as a float for comparison tests in modules.
     try:
         pslistfile = open(os.path.join(inputdir, 'System/Library/CoreServices/SystemVersion.plist'), 'rb')
-        try:
-            systemversion = plistlib.load(pslistfile)
-        except AttributeError:
+        if sys.version_info[0] < 3:
             systemversion = plistlib.readPlist(pslistfile)
+        else:
+            systemversion = plistlib.load(pslistfile)
         OSVersion = finditem(systemversion, 'ProductVersion')
         log.debug("Got OSVersion: {0}".format(OSVersion))
     except IOError:
-        if 'Volumes' not in inputdir and forensic_mode is not True:
-            try:
-                OSVersion, e = subprocess.Popen(["sw_vers", "-productVersion"], stdout=subprocess.PIPE).communicate()
-                log.debug("Got OSVersion: {0}".format(OSVersion))
-            except Exception as e:
-                log.error("Could not get OSVersion: {0}".format([traceback.format_exc()]))
-        else:
-            log.error("Could not get OSVersion: alternative method does not work on forensic image.")
-            OSVersion = None
-    except Exception as e:
+        try:
+            pslistfile = open(os.path.join(inputsysdir, 'System/Library/CoreServices/SystemVersion.plist'), 'rb')
+            if sys.version_info[0] < 3:
+                systemversion = plistlib.readPlist(pslistfile)
+            else:
+                systemversion = plistlib.load(pslistfile)
+
+            OSVersion = finditem(systemversion, 'ProductVersion')
+            log.debug("Got OSVersion: {0}".format(OSVersion))
+        except IOError:
+            if 'Volumes' not in inputdir and forensic_mode is not True:
+                try:
+                    OSVersion, e = subprocess.Popen(["sw_vers", "-productVersion"], stdout=subprocess.PIPE).communicate()
+                    log.debug("Got OSVersion: {0}".format(OSVersion))
+                except Exception:
+                    log.error("Could not get OSVersion: {0}".format([traceback.format_exc()]))
+            else:
+                log.error("Could not get OSVersion: alternative method does not work on forensic image.")
+                OSVersion = None
+    except Exception:
         log.error("Could not get OSVersion: {0}".format([traceback.format_exc()]))
         OSVersion = None
-
 
     if not args.no_logfile:
         prefix_logfile = os.path.join(outputdir, filename_prefix + ',' + logfilename)
@@ -595,8 +828,10 @@ if __name__ == "__main__":
         os.rename(logfile, prefix_logfile)
 
     # Clean up inputdir by removing trailing slash.
-    if len(inputdir) > 1 and inputdir[-1] is '/':
+    if len(inputdir) > 1 and inputdir[-1] == '/':
         inputdir = inputdir[:-1]
+    if len(inputsysdir) > 1 and inputsysdir[-1] == '/':
+        inputsysdir = inputsysdir[:-1]
 
     # Instantiate archive as build_tar object.
     tarname = full_prefix + ".tar"
@@ -617,8 +852,8 @@ if __name__ == "__main__":
     # Get program end time.
     endTime = datetime.utcnow()
     total_runTime = endTime - startTime
-    log.info("Finished program at {0}.".format(endTime))
-    log.info("Total runtime: {0}.".format(total_runTime))
+    log.info("Modules finished at {0}.".format(endTime))
+    log.info("Module runtime: {0}.".format(total_runTime))
 
     # Clean up any straggler files in the outputdir based on runID.
     stragglers = [i for i in glob.glob(outputdir + '/*') if runID in i]
@@ -629,4 +864,11 @@ if __name__ == "__main__":
 
     # Compress tar to tarball.
     if not no_tarball:
+        log.info("Creating tarball of output")
         tarball = gz_tar(full_prefix)
+
+    # Get program end time.
+    endTime = datetime.utcnow()
+    total_runTime = endTime - startTime
+    log.info("Finished program at {0}.".format(endTime))
+    log.info("Total runtime: {0}.".format(total_runTime))

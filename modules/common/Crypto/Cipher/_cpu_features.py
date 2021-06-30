@@ -31,7 +31,14 @@
 from ._raw_api import load_pycryptodome_raw_lib
 
 
-_raw_cpuid_lib = load_pycryptodome_raw_lib("Crypto.Util._cpuid_c",
+try:
+    _raw_cpuid_lib = load_pycryptodome_raw_lib("Crypto.Util._cpuid_c",
+                                           """
+                                           int have_aes_ni(void);
+                                           int have_clmul(void);
+                                           """)
+except Exception:
+    _raw_cpuid_lib = load_pycryptodome_raw_lib("Crypto.Util._cpuid_c_arm",
                                            """
                                            int have_aes_ni(void);
                                            int have_clmul(void);

@@ -1,10 +1,21 @@
 #!/usr/bin/env python
 
 import ctypes
-import ctypes
 import ctypes.util
-#import Foundation
-# import objc
+import sys
+
+if sys.version_info[0] < 3:
+    import Foundation
+    import objc
+
+try:
+    xrange
+except NameError:
+    xrange = range
+try:
+    unicode
+except NameError:
+    unicode = str
 
 class CodeSignChecker(object):
 

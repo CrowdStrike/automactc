@@ -5,17 +5,18 @@
 This is a modular forensic triage collection framework designed to access various forensic artifacts on macOS, parse them, and present them in formats viable for analysis. The output may provide valuable insights for incident response in a macOS environment. Automactc can be run against a live system or dead disk (as a mounted volume.)
 
 ## Requirements
-* Python 3.7.3 or earlier (It is also be backwards compatible with Python 2.7)
-* MacOS target systems, for live collection (successfully tested on macOS  major releases 10.11 through 10.15)
-* MacOS analysis systems, for triage against a mounted disk image (disk images from macOS 10.11 through 10.14 systems are supported)
+* Python 3.9 or earlier (backwards compatible with Python 2.7)
+* MacOS target systems, for live collection (successfully tested on macOS major releases 10.11 through 11.2.3 as well the as M1 processor)
+* MacOS analysis systems, for triage against a mounted disk image (disk images from macOS 10.11 through 10.15 systems are supported)
 
 ## Basic usage
 
-At its simplest, you can run automactc with the following invocation. Note: automactc requires sudo privileges to run, and should be called specifically from /usr/bin/python2.7 or /usr/bin/python3 to ensure full functionality.
+At its simplest, you can run automactc with the following invocation.
 	
-	sudo /usr/bin/python2.7 automactc.py -m all
+	sudo /usr/bin/python automactc.py -m all
 
 This will run all modules (-m) with default settings, i.e.
+
 	- default input directory will be /, or the root of the current volume
 	- default output directory will be ./, or the working directory from which automactc is run (NOT the location of the script)
 	- default prefix for output filenames will be automactc-output
@@ -23,6 +24,7 @@ This will run all modules (-m) with default settings, i.e.
 	- default format for individual artifacts output files is CSV
 	- default CPU priority is set to low
 	- default behavior on completion is to compress all output files to tar.gz
+using the version of python that is pre-installed on the macOS device.
 
 In order to list all available modules and do nothing else, simply run:
 
@@ -30,7 +32,9 @@ In order to list all available modules and do nothing else, simply run:
 
 The inputdir and outputdir can be specified with the -i and -o flags, respectively. 
 	
-	automactc.py -i / -o /automactc_output -m all 
+	automactc.py -i / -o /automactc_output -m all
+
+For macOS 10.15+ systems, the -is flag is used to specify the input system drive if using mounted drive from 10.15+ system (e.g. "Macintosh HD").
 
 Modules can be specified for inclusion or exclusion on a per-module basis. In other words, you can INCLUDE specific modules, such as pslist, bash, and profiler:
 	
@@ -67,14 +71,16 @@ While the default behavior is to generate a tarball, use of the -nt flag will pr
 	- pslist (current process list at time of automactc run)
 	- lsof (current file handles open at time of automactc run)
 	- netstat (current network connections at time of automactc run)
-	- asl (parsing of Apple System Log (.asl) files)
-	- auditlog (parsing of /private/var/audit/* files)
+	- unifiedlogs (collect Unified Logging events from a live system based on specified predicates)
+	- asl (parsed Apple System Log (.asl) files)
+	- auditlog (parsing audit log files from private/var/audit/)
 	- autoruns (parsing of various persistence locations and plists)
 	- bash (parsing bash/.*_history files for all users)
 	- chrome (parsing chrome visit history and download history)
-	- cookies (parsing chrome and firefox cookies)
+	- cookies (parsing the cookies database for each user for chrome and firefox)
 	- coreanalytics (parsing program execution evidence produced by Apple diagnostics)
-	- dirlist (list of files and directories across the disk)
+	- dirlist (list hof files and directories across the disk)
+	- eventtaps (parsing event tap items)
 	- firefox (parsing firefox visit history and download history)
 	- installhistory (parsing program installation history)
 	- mru (parsing SFL and MRU plist files)
@@ -86,12 +92,30 @@ While the default behavior is to generate a tarball, use of the -nt flag will pr
 	- ssh (parsing known_hosts and authorized_keys files for each user)
 	- syslog (parsing system.log files)
 	- systeminfo (basic system identification, such as current IP address, serial no, hostname)
-	- terminalstate (parsing Terminal savedState files)
+	- terminalstate (decode and parse savedState files for the Terminal application for each user)
 	- users (listing present and deleted users on the system)
 	- utmpx (listing user sessions on terminals)
 
 
 ## Advanced usage
+
+One can utilize the **--rtr** flag to reduce verbosity of some modules to display nicely on CrowdStrike RTR console. Specifically the real time updates of the dirlist module are reduced in order to not overflow the console window.
+
+	automactc.py -m all --rtr
+
+AutoMacTC can be deployed and executed with the provided sample bash wrapper **deploy.sh**. The provided wrapper will 
+- execute AutoMacTC with the version python installed at **/usr/bin/python**
+- use the **--rtr** flag to reduce verbosity when running remotely via a terminal
+- use the **--prefix** 'automactc-output'
+- output in **json** format
+- exclude the 10.14/10.15+ unsupported live modules **quicklooks**, **coreanalytics**, and **safari**
+
+To use the wrapper script: 
+- Compress the automactc folder into a tar.gz archive
+- Copy the archive and the wrapper script to the host system into their own folder (or a location such as /private/tmp or /tmp)
+- Run the wrapper with sudo
+
+	sudo bash deploy.sh
 
 By default, automactc populates verbose debug logging into a file named `prefix,hostname,ip,runtime.log`. You can disable the generation of this log with:
 
@@ -137,6 +161,8 @@ By default, the following directories and file are excluded on live systems:
 	/Users/*/Calendar (to avoid permissions errors)
 	/Users/*/Library/Calendars (to avoid permissions errors)
 	/Users/*/Library/Preferences/com.apple.AddressBook.plist (to avoid permissions errors)
+	/System/Volumes/Data/private/var/folders/kb/* (to reduce output verbosity)
+	/System/Volumes/Data/private/var/folders/zz/* (to reduce output verbosity)
 
 By default, the following directories are excluded when running forensic mode against a mounted image:
 	
@@ -164,7 +190,7 @@ By default, the dirlist module will only hash files with sizes under 10mb. To ov
 
 By default, the dirlist module will NOT recurse into bundle directories, including the following: 
 	
-	'.app', '.framework','.lproj','.plugin','.kext','.osax','.bundle','.driver','.wdgt'
+	'.app', '.framework','.lproj','.plugin','.kext','.osax','.bundle','.driver','.wdgt','.Office','.blacklight'
 
 To override this setting, use the -R flag. NOTE: this produces a far higher volume of output and takes significantly more time. These bundle directories will be configurable in a future update.
 
@@ -176,81 +202,97 @@ By default, the dirlist module has been multithreaded to increase processing spe
 
 	automactc.py -m dirlist -NM
 
+## Unified Logs Live module
+
+By default, to reduce verbosity and time taken, only a subset of the total available sample predicates are enabled. You can optionally enable additional predicates by removing the comment character from existing predicates or by adding your own custom predicates.
+
+The sample set of predicates was obtained from https://www.crowdstrike.com/blog/how-to-leverage-apple-unified-log-for-incident-response/. 
+
 ## Help Menu
 	usage: automactc.py [-m INCLUDE_MODULES [INCLUDE_MODULES ...] | -x
-	                    EXCLUDE_MODULES [EXCLUDE_MODULES ...] | -l] [-h]
-	                    [-i INPUTDIR] [-o OUTPUTDIR] [-p PREFIX] [-f] [-nt] [-nl]
-	                    [-fmt {csv,json}] [-np] [-b] [-q | -d]
-	                    [-K DIR_INCLUDE_DIRS [DIR_INCLUDE_DIRS ...]]
-	                    [-E DIR_EXCLUDE_DIRS [DIR_EXCLUDE_DIRS ...]]
-	                    [-H DIR_HASH_ALG [DIR_HASH_ALG ...]]
-	                    [-S DIR_HASH_SIZE_LIMIT] [-R] [-NC] [-NM]
+                    EXCLUDE_MODULES [EXCLUDE_MODULES ...] | -l] [-h] [-v]
+                    [-i INPUTDIR] [-is INPUTSYSDIR] [-o OUTPUTDIR] [-p PREFIX]
+                    [-f] [-nt] [-nl] [-fmt {csv,json}] [-np] [-b] [-O]
+                    [-q | -r | -d]
+                    [-K DIR_INCLUDE_DIRS [DIR_INCLUDE_DIRS ...]]
+                    [-E DIR_EXCLUDE_DIRS [DIR_EXCLUDE_DIRS ...]]
+                    [-H DIR_HASH_ALG [DIR_HASH_ALG ...]]
+                    [-S DIR_HASH_SIZE_LIMIT] [-R] [-NC] [-NM]
 
-	AutoMacTC: an Automated macOS forensic triage collection framework.
+AutoMacTC: an Automated macOS forensic triage collection framework.
 
-	module filter:
-	  -m INCLUDE_MODULES [INCLUDE_MODULES ...], --include_modules INCLUDE_MODULES [INCLUDE_MODULES ...]
-	                        module(s) to use, use "all" to run all modules, space
-	                        separated list only
-	  -x EXCLUDE_MODULES [EXCLUDE_MODULES ...], --exclude_modules EXCLUDE_MODULES [EXCLUDE_MODULES ...]
-	                        assumes you want to run all modules EXCEPT those
-	                        specified here, space separated list only
-	  -l, --list_modules    if flag is provided, will list available modules and
-	                        exit.
+module filter:
+  -m INCLUDE_MODULES [INCLUDE_MODULES ...], --include_modules INCLUDE_MODULES [INCLUDE_MODULES ...]
+                        module(s) to use, use "all" to run all modules, space
+                        separated list only
+  -x EXCLUDE_MODULES [EXCLUDE_MODULES ...], --exclude_modules EXCLUDE_MODULES [EXCLUDE_MODULES ...]
+                        assumes you want to run all modules EXCEPT those
+                        specified here, space separated list only
+  -l, --list_modules    if flag is provided, will list available modules and
+                        exit.
 
-	general arguments:
-	  -h, --help            show this help message and exit
-	  -i INPUTDIR, --inputdir INPUTDIR
-	                        input directory (mount dmg with mountdmg.sh script and
-	                        use -f to analyze mounted HFS or APFS Volume)
-	  -o OUTPUTDIR, --outputdir OUTPUTDIR
-	                        output directory
-	  -p PREFIX, --prefix PREFIX
-	                        prefix to append to tarball and/or output files
-	  -f, --forensic_mode   if flag is provided, will analyze mounted volume
-	                        provided as inputdir
-	  -nt, --no_tarball     if flag is provided, will NOT package output files
-	                        into tarball
-	  -nl, --no_logfile     if flag is provided, will NOT generate logfile on disk
-	  -fmt {csv,json}, --output_format {csv,json}
-	                        toggle between csv and json output, defaults to csv
-	  -np, --no_low_priority
-	                        if flag is provided, will NOT run automactc with
-	                        highest niceness (lowest CPU priority). high niceness
-	                        is default
-	  -b, --multiprocessing
-	                        if flag is provided, WILL multiprocess modules
-	                        [WARNING: Experimental!]
+general arguments:
+  -h, --help            show this help message and exit
+  -v, --verbose         enable verbose logging
+  -i INPUTDIR, --inputdir INPUTDIR
+                        input directory; mount dmg with mountdmg.sh script and
+                        use -f to analyze mounted HFS or APFS Volume, use
+                        volume appended with "Data" (e.g. "Macintosh HD -
+                        Data") for 10.15+ systems
+  -is INPUTSYSDIR, --inputsysdir INPUTSYSDIR
+                        input system drive if using mounted drive from 10.15+
+                        system (e.g. "Macintosh HD")
+  -o OUTPUTDIR, --outputdir OUTPUTDIR
+                        output directory
+  -p PREFIX, --prefix PREFIX
+                        prefix to append to tarball and/or output files
+  -f, --forensic_mode   if flag is provided, will analyze mounted volume
+                        provided as inputdir
+  -nt, --no_tarball     if flag is provided, will NOT package output files
+                        into tarball
+  -nl, --no_logfile     if flag is provided, will NOT generate logfile on disk
+  -fmt {csv,json}, --output_format {csv,json}
+                        toggle between csv and json output, defaults to csv
+  -np, --no_low_priority
+                        if flag is provided, will NOT run automactc with
+                        highest niceness (lowest CPU priority). high niceness
+                        is default
+  -b, --multiprocessing
+                        if flag is provided, WILL multiprocess modules
+                        [WARNING: Experimental!]
+  -O, --override_mount  if flag is provided, WILL bypass error where inputdir
+                        does not contain expected subdirs
 
-	console logging verbosity:
-	  -q, --quiet           if flag is provided, will NOT output to console at all
-	  -d, --debug           enable debug logging to console
+console logging verbosity:
+  -q, --quiet           if flag is provided, will NOT output to console at all
+  -r, --rtr             reduce verbosity to display nicely on RTR console
+  -d, --debug           enable debug logging to console
 
-	specific module arguments:
-	  -K DIR_INCLUDE_DIRS [DIR_INCLUDE_DIRS ...], --dir_include_dirs DIR_INCLUDE_DIRS [DIR_INCLUDE_DIRS ...]
-	                        directory inclusion filter for dirlist module,
-	                        defaults to volume root, space separated list only
-	  -E DIR_EXCLUDE_DIRS [DIR_EXCLUDE_DIRS ...], --dir_exclude_dirs DIR_EXCLUDE_DIRS [DIR_EXCLUDE_DIRS ...]
-	                        directory and file exclusion filter for dirlist
-	                        module. defaults are specified in README. space
-	                        separated list only. put 'no-defaults' as first item
-	                        to overwrite default exclusions and then provide your
-	                        own exclusions
-	  -H DIR_HASH_ALG [DIR_HASH_ALG ...], --dir_hash_alg DIR_HASH_ALG [DIR_HASH_ALG ...]
-	                        either sha256 or md5 or both or none, at least one is
-	                        recommended, defaults to sha256. also applies to
-	                        autoruns module
-	  -S DIR_HASH_SIZE_LIMIT, --dir_hash_size_limit DIR_HASH_SIZE_LIMIT
-	                        file size filter for which files to hash, in
-	                        megabytes, defaults to 10MB. also applies to autoruns
-	                        module
-	  -R, --dir_recurse_bundles
-	                        will fully recurse app bundles if flag is provided.
-	                        this takes much more time and space
-	  -NC, --dir_no_code_signatures
-	                        if flag is provided, will NOT check code signatures
-	                        for app and kext files. also applies to autoruns
-	                        module
-	  -NM, --dir_no_multithreading
-	                        if flag is provided, will NOT multithread the dirlist
-	                        module
+specific module arguments:
+  -K DIR_INCLUDE_DIRS [DIR_INCLUDE_DIRS ...], --dir_include_dirs DIR_INCLUDE_DIRS [DIR_INCLUDE_DIRS ...]
+                        directory inclusion filter for dirlist module,
+                        defaults to volume root, space separated list only
+  -E DIR_EXCLUDE_DIRS [DIR_EXCLUDE_DIRS ...], --dir_exclude_dirs DIR_EXCLUDE_DIRS [DIR_EXCLUDE_DIRS ...]
+                        directory and file exclusion filter for dirlist
+                        module. defaults are specified in README. space
+                        separated list only. put 'no-defaults' as first item
+                        to overwrite default exclusions and then provide your
+                        own exclusions
+  -H DIR_HASH_ALG [DIR_HASH_ALG ...], --dir_hash_alg DIR_HASH_ALG [DIR_HASH_ALG ...]
+                        either sha256 or md5 or both or none, at least one is
+                        recommended, defaults to sha256. also applies to
+                        autoruns module
+  -S DIR_HASH_SIZE_LIMIT, --dir_hash_size_limit DIR_HASH_SIZE_LIMIT
+                        file size filter for which files to hash, in
+                        megabytes, defaults to 10MB. also applies to autoruns
+                        module
+  -R, --dir_recurse_bundles
+                        will fully recurse app bundles if flag is provided.
+                        this takes much more time and space
+  -NC, --dir_no_code_signatures
+                        if flag is provided, will NOT check code signatures
+                        for app and kext files. also applies to autoruns
+                        module
+  -NM, --dir_no_multithreading
+                        if flag is provided, will NOT multithread the dirlist
+                        module
