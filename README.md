@@ -222,77 +222,81 @@ The sample set of predicates was obtained from https://www.crowdstrike.com/blog/
 AutoMacTC: an Automated macOS forensic triage collection framework.
 
 module filter:
-  -m INCLUDE_MODULES [INCLUDE_MODULES ...], --include_modules INCLUDE_MODULES [INCLUDE_MODULES ...]
-                        module(s) to use, use "all" to run all modules, space
-                        separated list only
-  -x EXCLUDE_MODULES [EXCLUDE_MODULES ...], --exclude_modules EXCLUDE_MODULES [EXCLUDE_MODULES ...]
-                        assumes you want to run all modules EXCEPT those
-                        specified here, space separated list only
-  -l, --list_modules    if flag is provided, will list available modules and
-                        exit.
+
+	-m INCLUDE_MODULES [INCLUDE_MODULES ...], --include_modules INCLUDE_MODULES [INCLUDE_MODULES ...]
+							module(s) to use, use "all" to run all modules, space
+							separated list only
+	-x EXCLUDE_MODULES [EXCLUDE_MODULES ...], --exclude_modules EXCLUDE_MODULES [EXCLUDE_MODULES ...]
+							assumes you want to run all modules EXCEPT those
+							specified here, space separated list only
+	-l, --list_modules    if flag is provided, will list available modules and
+							exit.
 
 general arguments:
-  -h, --help            show this help message and exit
-  -v, --verbose         enable verbose logging
-  -i INPUTDIR, --inputdir INPUTDIR
-                        input directory; mount dmg with mountdmg.sh script and
-                        use -f to analyze mounted HFS or APFS Volume, use
-                        volume appended with "Data" (e.g. "Macintosh HD -
-                        Data") for 10.15+ systems
-  -is INPUTSYSDIR, --inputsysdir INPUTSYSDIR
-                        input system drive if using mounted drive from 10.15+
-                        system (e.g. "Macintosh HD")
-  -o OUTPUTDIR, --outputdir OUTPUTDIR
-                        output directory
-  -p PREFIX, --prefix PREFIX
-                        prefix to append to tarball and/or output files
-  -f, --forensic_mode   if flag is provided, will analyze mounted volume
-                        provided as inputdir
-  -nt, --no_tarball     if flag is provided, will NOT package output files
-                        into tarball
-  -nl, --no_logfile     if flag is provided, will NOT generate logfile on disk
-  -fmt {csv,json}, --output_format {csv,json}
-                        toggle between csv and json output, defaults to csv
-  -np, --no_low_priority
-                        if flag is provided, will NOT run automactc with
-                        highest niceness (lowest CPU priority). high niceness
-                        is default
-  -b, --multiprocessing
-                        if flag is provided, WILL multiprocess modules
-                        [WARNING: Experimental!]
-  -O, --override_mount  if flag is provided, WILL bypass error where inputdir
-                        does not contain expected subdirs
+
+	-h, --help            show this help message and exit
+	-v, --verbose         enable verbose logging
+	-i INPUTDIR, --inputdir INPUTDIR
+							input directory; mount dmg with mountdmg.sh script and
+							use -f to analyze mounted HFS or APFS Volume, use
+							volume appended with "Data" (e.g. "Macintosh HD -
+							Data") for 10.15+ systems
+	-is INPUTSYSDIR, --inputsysdir INPUTSYSDIR
+							input system drive if using mounted drive from 10.15+
+							system (e.g. "Macintosh HD")
+	-o OUTPUTDIR, --outputdir OUTPUTDIR
+							output directory
+	-p PREFIX, --prefix PREFIX
+							prefix to append to tarball and/or output files
+	-f, --forensic_mode   if flag is provided, will analyze mounted volume
+							provided as inputdir
+	-nt, --no_tarball     if flag is provided, will NOT package output files
+							into tarball
+	-nl, --no_logfile     if flag is provided, will NOT generate logfile on disk
+	-fmt {csv,json}, --output_format {csv,json}
+							toggle between csv and json output, defaults to csv
+	-np, --no_low_priority
+							if flag is provided, will NOT run automactc with
+							highest niceness (lowest CPU priority). high niceness
+							is default
+	-b, --multiprocessing
+							if flag is provided, WILL multiprocess modules
+							[WARNING: Experimental!]
+	-O, --override_mount  if flag is provided, WILL bypass error where inputdir
+							does not contain expected subdirs
 
 console logging verbosity:
-  -q, --quiet           if flag is provided, will NOT output to console at all
-  -r, --rtr             reduce verbosity to display nicely on RTR console
-  -d, --debug           enable debug logging to console
+
+	-q, --quiet           if flag is provided, will NOT output to console at all
+	-r, --rtr             reduce verbosity to display nicely on RTR console
+	-d, --debug           enable debug logging to console
 
 specific module arguments:
-  -K DIR_INCLUDE_DIRS [DIR_INCLUDE_DIRS ...], --dir_include_dirs DIR_INCLUDE_DIRS [DIR_INCLUDE_DIRS ...]
-                        directory inclusion filter for dirlist module,
-                        defaults to volume root, space separated list only
-  -E DIR_EXCLUDE_DIRS [DIR_EXCLUDE_DIRS ...], --dir_exclude_dirs DIR_EXCLUDE_DIRS [DIR_EXCLUDE_DIRS ...]
-                        directory and file exclusion filter for dirlist
-                        module. defaults are specified in README. space
-                        separated list only. put 'no-defaults' as first item
-                        to overwrite default exclusions and then provide your
-                        own exclusions
-  -H DIR_HASH_ALG [DIR_HASH_ALG ...], --dir_hash_alg DIR_HASH_ALG [DIR_HASH_ALG ...]
-                        either sha256 or md5 or both or none, at least one is
-                        recommended, defaults to sha256. also applies to
-                        autoruns module
-  -S DIR_HASH_SIZE_LIMIT, --dir_hash_size_limit DIR_HASH_SIZE_LIMIT
-                        file size filter for which files to hash, in
-                        megabytes, defaults to 10MB. also applies to autoruns
-                        module
-  -R, --dir_recurse_bundles
-                        will fully recurse app bundles if flag is provided.
-                        this takes much more time and space
-  -NC, --dir_no_code_signatures
-                        if flag is provided, will NOT check code signatures
-                        for app and kext files. also applies to autoruns
-                        module
-  -NM, --dir_no_multithreading
-                        if flag is provided, will NOT multithread the dirlist
-                        module
+
+	-K DIR_INCLUDE_DIRS [DIR_INCLUDE_DIRS ...], --dir_include_dirs DIR_INCLUDE_DIRS [DIR_INCLUDE_DIRS ...]
+							directory inclusion filter for dirlist module,
+							defaults to volume root, space separated list only
+	-E DIR_EXCLUDE_DIRS [DIR_EXCLUDE_DIRS ...], --dir_exclude_dirs DIR_EXCLUDE_DIRS [DIR_EXCLUDE_DIRS ...]
+							directory and file exclusion filter for dirlist
+							module. defaults are specified in README. space
+							separated list only. put 'no-defaults' as first item
+							to overwrite default exclusions and then provide your
+							own exclusions
+	-H DIR_HASH_ALG [DIR_HASH_ALG ...], --dir_hash_alg DIR_HASH_ALG [DIR_HASH_ALG ...]
+							either sha256 or md5 or both or none, at least one is
+							recommended, defaults to sha256. also applies to
+							autoruns module
+	-S DIR_HASH_SIZE_LIMIT, --dir_hash_size_limit DIR_HASH_SIZE_LIMIT
+							file size filter for which files to hash, in
+							megabytes, defaults to 10MB. also applies to autoruns
+							module
+	-R, --dir_recurse_bundles
+							will fully recurse app bundles if flag is provided.
+							this takes much more time and space
+	-NC, --dir_no_code_signatures
+							if flag is provided, will NOT check code signatures
+							for app and kext files. also applies to autoruns
+							module
+	-NM, --dir_no_multithreading
+							if flag is provided, will NOT multithread the dirlist
+							module
