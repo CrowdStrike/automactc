@@ -7,6 +7,7 @@ import itertools
 import json
 import logging
 import os
+import shutil
 import sqlite3
 import sys
 import time
@@ -42,10 +43,17 @@ def get_chrome_version(history_db):
 
 
 def parse_visit_history(db_filepath, user, profile, urls_output, urls_headers):
+    """The History SQLite database is locked so we need to make a copy of it so
+    that automactc can access it and include it in the output. This copied database
+    is deleted after parsing is complete.
+    """
+    copied_filepath = "%s-automactc-copy" % db_filepath
+    shutil.copy(db_filepath, copied_filepath)
+
     # instantiate db wrapper
     db_wrapper = SQLiteDB()
-    if db_wrapper.open(db_filepath, outputdir) is False:
-        log.debug('Unable to open db {0}'.format(db_filepath))
+    if db_wrapper.open(copied_filepath, outputdir) is False:
+        log.debug('Unable to open db {0}'.format(copied_filepath))
         return
 
     # Check for required tables
@@ -59,10 +67,10 @@ def parse_visit_history(db_filepath, user, profile, urls_output, urls_headers):
         log.debug("Visit History required table 'urls' not found.")
         return
 
-    log.debug('[Start] Executing Visit History query against {0} for user {1}'.format(db_filepath, user))
+    log.debug('[Start] Executing Visit History query against {0} for user {1}'.format(copied_filepath, user))
 
     try:
-        urls_data = db_wrapper.query_db(db_filepath,
+        urls_data = db_wrapper.query_db(copied_filepath,
 
             'SELECT visit_time, urls.url, title, visit_duration, visit_count, \
             typed_count, urls.last_visit_time, term \
@@ -72,7 +80,7 @@ def parse_visit_history(db_filepath, user, profile, urls_output, urls_headers):
         log.debug("[Chrome visit history for - {0}] Found {1} lines of data.".format(profile, len(urls_data)))
 
     except Exception:
-        log.error("Unable to query {0}: {1}".format(db_filepath, [traceback.format_exc()]))
+        log.error("Unable to query {0}: {1}".format(copied_filepath, [traceback.format_exc()]))
 
         # u_cnames = get_db_column_headers(history_db, 'urls')
         # log.debug('Columns available in "{0}" table: {1}'.format('urls', str(u_cnames)))
@@ -107,7 +115,10 @@ def parse_visit_history(db_filepath, user, profile, urls_output, urls_headers):
             record['search_term'] = ''
 
         urls_output.write_record(record)
-    log.debug('[End] Finished executing Visit History query against {0} for user {1}'.format(db_filepath, user))
+    log.debug('[End] Finished executing Visit History query against {0} for user {1}'.format(copied_filepath, user))
+
+    # Removes the copied database.
+    os.remove(copied_filepath)
 
 
 def parse_download_history(db_filepath, user, profile, downloads_output, downloads_headers):
